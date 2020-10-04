@@ -1,8 +1,8 @@
 use std::env;
 use std::fs::File;
-use std::io::prelude::*;
-use std::io::{self, BufReader, Read, Write};
+use std::io::{self, BufRead, BufReader, Read, Write};
 
+use rlox::scanner::Scanner;
 
 fn run_prompt() {
     let mut lines = BufReader::new(io::stdin()).lines();
@@ -21,7 +21,13 @@ fn run_prompt() {
 }
 
 fn run(source: &str) {
-    println!("{}", source);
+    let scanner = Scanner::new(source);
+    for token in scanner {
+        match token {
+            Ok(token) => println!("{:?}", token),
+            Err(err) => println!("{:?}", err),
+        }
+    }
 }
 
 fn main() {

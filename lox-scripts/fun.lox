@@ -1,0 +1,26 @@
+fun odd_or_even(x) {
+    var xx = (x / 2) * 2;
+    if (xx == x) {
+        print "x is even";
+    } else {
+        print "x is odd";
+    }
+}
+
+
+fun fib_recursive(n) {
+    if (n <= 1) {
+        return 0;
+    }
+    if (n == 2) {
+        return 1;
+    }
+    return fib(n-2) + fib(n-1)
+}
+
+
+print odd_or_even(42);
+print odd_or_even(41);
+
+print fib_recursive(5);
+

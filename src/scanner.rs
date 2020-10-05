@@ -64,6 +64,13 @@ impl Token {
     pub fn new(position: Position, kind: TokenKind) -> Token {
         Token { position, kind }
     }
+
+    pub(crate) fn with_kind(kind: TokenKind) -> Token {
+        Token {
+            position: Position::default(),
+            kind,
+        }
+    }
 }
 
 impl fmt::Debug for Token {
@@ -78,7 +85,7 @@ impl fmt::Debug for Token {
     }
 }
 
-#[derive(Clone, Copy, Eq, PartialEq)]
+#[derive(Clone, Copy, Eq, PartialEq, Default)]
 pub struct Position {
     pub offset: usize,
     pub line: usize,

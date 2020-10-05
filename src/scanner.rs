@@ -17,6 +17,7 @@ pub enum TokenKind {
     SLASH,
     STAR,
     SPACE,
+    COMMENT,
 
     // One or two character tokens.
     BANG,
@@ -67,7 +68,13 @@ impl Token {
 
 impl fmt::Debug for Token {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "token {:?}", self.kind)
+        match &self.kind {
+            TokenKind::PLUS => write!(f, "+"),
+            TokenKind::MINUS => write!(f, "-"),
+            TokenKind::SLASH => write!(f, "/"),
+            TokenKind::STAR => write!(f, "*"),
+            other => write!(f, "token {:?}", other),
+        }
     }
 }
 
@@ -313,8 +320,15 @@ impl<'a> std::iter::Iterator for Scanner<'a> {
                 '-' => Ok(TokenKind::MINUS),
                 '+' => Ok(TokenKind::PLUS),
                 ';' => Ok(TokenKind::SEMICOLON),
-                '/' => Ok(TokenKind::SLASH),
                 '*' => Ok(TokenKind::STAR),
+                '/' => {
+                    if self.advance_if_eq('/') {
+                        self.advance_while(|c| c != '\n');
+                        Ok(TokenKind::COMMENT)
+                    } else {
+                        Ok(TokenKind::SLASH)
+                    }
+                }
                 c if is_whitespace(c) => Ok(TokenKind::SPACE),
                 // cmp
                 '!' => Ok(if self.advance_if_eq('=') {
@@ -347,15 +361,10 @@ impl<'a> std::iter::Iterator for Scanner<'a> {
             };
 
             match kind {
-                Ok(kind) => {
-                    if kind == TokenKind::SPACE {
-                        // ignore whitespaces
-                        self.next()
-                    } else {
-                        // find one token
-                        Some(Ok(Token::new(current_pos, kind)))
-                    }
-                }
+                // ignore whitespace and comments
+                Ok(TokenKind::SPACE) | Ok(TokenKind::COMMENT) => self.next(),
+                // find useful one
+                Ok(kind) => Some(Ok(Token::new(current_pos, kind))),
                 Err(e) => Some(Err(e)),
             }
         } else {

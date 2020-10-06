@@ -2,6 +2,8 @@ use std::env;
 use std::fs::File;
 use std::io::{self, BufRead, BufReader, Read, Write};
 
+use rlox::ast::ast_printer::AstPrint;
+use rlox::parser::Parser;
 use rlox::scanner::Scanner;
 
 fn run_prompt() {
@@ -20,25 +22,31 @@ fn run_prompt() {
     }
 }
 
+fn run_file(filename: String) {
+    let mut source = String::new();
+    File::open(filename)
+        .and_then(|mut f| f.read_to_string(&mut source))
+        .expect("read source file failed");
+    run(&source);
+}
+
 fn run(source: &str) {
     let scanner = Scanner::new(source);
-    for token in scanner {
-        match token {
-            Ok(token) => println!("{:?}", token),
-            Err(err) => println!("{:?}", err),
+    let mut parser = Parser::new(scanner);
+    let expr = parser.parse();
+    match expr {
+        Ok(expr) => println!("{}", expr.print_ast()),
+        Err(errs) => {
+            for e in errs {
+                println!("{}", e);
+            }
         }
     }
 }
 
 fn main() {
     match env::args().nth(1) {
-        Some(file) => {
-            let mut source = String::new();
-            File::open(file)
-                .and_then(|mut f| f.read_to_string(&mut source))
-                .expect("read source file failed");
-            run(&source);
-        }
+        Some(file) => run_file(file),
         None => run_prompt(),
     }
     println!("Bye Bye!");

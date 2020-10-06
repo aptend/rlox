@@ -2,7 +2,7 @@ use std::fmt;
 use std::str;
 
 #[allow(non_camel_case_types)]
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug)]
 pub enum TokenKind {
     // Single-character tokens.
     LEFT_PAREN,
@@ -55,6 +55,13 @@ pub enum TokenKind {
     EOF,
 }
 
+impl std::cmp::PartialEq for TokenKind {
+    fn eq(&self, other: &Self) -> bool {
+        // we only compare the type of variant, let its value untouched.
+        std::mem::discriminant(self) == std::mem::discriminant(other)
+    }
+}
+
 pub struct Token {
     pub position: Position,
     pub kind: TokenKind,
@@ -65,6 +72,7 @@ impl Token {
         Token { position, kind }
     }
 
+    #[cfg(test)]
     pub(crate) fn with_kind(kind: TokenKind) -> Token {
         Token {
             position: Position::default(),
@@ -80,6 +88,13 @@ impl fmt::Debug for Token {
             TokenKind::MINUS => write!(f, "-"),
             TokenKind::SLASH => write!(f, "/"),
             TokenKind::STAR => write!(f, "*"),
+            TokenKind::LESS => write!(f, "<"),
+            TokenKind::LESS_EQUAL => write!(f, "<="),
+            TokenKind::EQUAL => write!(f, "="),
+            TokenKind::EQUAL_EQUAL => write!(f, "=="),
+            TokenKind::BANG_EQUAL => write!(f, "!="),
+            TokenKind::GREATER => write!(f, ">"),
+            TokenKind::GREATER_EQUAL => write!(f, ">="),
             other => write!(f, "token {:?}", other),
         }
     }
@@ -130,7 +145,7 @@ impl fmt::Debug for ScanError {
                 s.as_str()
             }
         };
-        write!(f, "{:?} Error: {}", self.pos, msg)
+        write!(f, "{:?} SyntaxError: {}", self.pos, msg)
     }
 }
 

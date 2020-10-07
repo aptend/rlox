@@ -25,7 +25,18 @@ impl AstPrint for Expr {
             Expr::Binary(v) => v.print_ast(),
             Expr::Grouping(v) => v.print_ast(),
             Expr::Variable(v) => v.print_ast(),
+            Expr::Assign(v) => v.print_ast(),
         }
+    }
+}
+
+impl AstPrint for AssignExpr {
+    fn print_ast(&self) -> String {
+        format!(
+            "({} <- {})",
+            self.name.string_ref().unwrap(),
+            self.value.print_ast()
+        )
     }
 }
 
@@ -43,7 +54,7 @@ impl AstPrint for Grouping {
 
 impl AstPrint for VariableExpr {
     fn print_ast(&self) -> String {
-        self.token.string_ref().unwrap().to_owned()
+        self.name.string_ref().unwrap().to_owned()
     }
 }
 

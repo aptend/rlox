@@ -1,0 +1,7 @@
+// Runtime Error
+
+var = 99 + + 12i; // synchronize skips '+ +' error
+var;
+
+var a = 12;
+a + 12 = 22;  // invalid assignment target

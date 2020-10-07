@@ -82,16 +82,32 @@ impl Interpret for Expr {
             Expr::Binary(b) => b.interpret(interpreter),
             Expr::Grouping(g) => g.interpret(interpreter),
             Expr::Variable(v) => v.interpret(interpreter),
+            Expr::Assign(a) => a.interpret(interpreter),
+        }
+    }
+}
+
+impl Interpret for AssignExpr {
+    fn interpret(&self, interpreter: &mut Interpreter) -> RuntimeResult<Value> {
+        let val = self.value.interpret(interpreter)?;
+        match interpreter.env.get_mut(self.name.string_ref().unwrap()) {
+            Some(v) => {
+                *v = val.clone();
+                Ok(val)
+            }
+            None => Err(RuntimeError::UndefinedIdentifier(Box::new(
+                self.name.clone(),
+            ))),
         }
     }
 }
 
 impl Interpret for VariableExpr {
     fn interpret(&self, interpreter: &mut Interpreter) -> RuntimeResult<Value> {
-        match interpreter.env.get(self.token.string_ref().unwrap()) {
+        match interpreter.env.get(self.name.string_ref().unwrap()) {
             Some(v) => Ok(v.clone()),
             None => Err(RuntimeError::UndefinedIdentifier(Box::new(
-                self.token.clone(),
+                self.name.clone(),
             ))),
         }
     }

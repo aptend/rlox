@@ -5,6 +5,7 @@ pub enum Expr {
     Grouping(Grouping),
     Literal(Literal),
     Variable(VariableExpr),
+    Assign(AssignExpr),
 }
 
 impl Expr {
@@ -42,7 +43,14 @@ impl Expr {
     }
 
     pub fn new_variable(token: Token) -> Expr {
-        Expr::Variable(VariableExpr { token })
+        Expr::Variable(VariableExpr { name: token })
+    }
+
+    pub fn new_assign(name: Token, value: Expr) -> Expr {
+        Expr::Assign(AssignExpr {
+            name,
+            value: Box::new(value),
+        })
     }
 }
 
@@ -75,5 +83,10 @@ pub enum Literal {
 }
 
 pub struct VariableExpr {
-    pub token: Token,
+    pub name: Token,
+}
+
+pub struct AssignExpr {
+    pub name: Token,
+    pub value: Box<Expr>,
 }

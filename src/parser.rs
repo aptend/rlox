@@ -1,4 +1,5 @@
-// expression -> equality;
+// expression -> assignment;
+// assignment -> IDENT "=" assignment | equality // right-associated
 // equality   -> comparison (("==" | "!=") comparison)*;
 // comparison -> term (("<" | "<=" | ">" | ">=") term)*;
 // term       -> factor (("+" | "-") factor)*;
@@ -20,6 +21,7 @@ pub enum SyntaxError {
     ExpectRightParen(BoxToken),
     ExpectSemicolon(BoxToken),
     ExpectIdentifier(BoxToken),
+    InvalidAssignTarget(BoxToken),
     LexError(ScanError),
 }
 
@@ -29,36 +31,38 @@ impl std::convert::From<ScanError> for SyntaxError {
     }
 }
 
+fn write_position(f: &mut fmt::Formatter<'_>, token: &Token) -> fmt::Result {
+    if token.kind == TokenKind::EOF {
+        write!(f, "[the last line] SyntaxError: ")
+    } else {
+        let (line, col) = (token.position.line, token.position.column);
+        write!(f, "[line {}, column {}] SyntaxError: ", line, col)
+    }
+}
+
 impl fmt::Display for SyntaxError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        if let SyntaxError::LexError(err) = self {
-            write!(f, "{:?}", err)
-        } else {
-            let (token, msg) = match self {
-                SyntaxError::ExpectExpression(t) => {
-                    (Some(t), "expect a expression")
-                }
-                SyntaxError::ExpectRightParen(t) => {
-                    (Some(t), "expect a close parenthese")
-                }
-                SyntaxError::ExpectSemicolon(t) => {
-                    (Some(t), "expect ';' after value")
-                }
-                SyntaxError::ExpectIdentifier(t) => {
-                    (Some(t), "expect an identifier")
-                }
-                _ => (None, ""),
-            };
-            let token = token.unwrap();
-            if token.kind == TokenKind::EOF {
-                write!(f, "[the last line] SyntaxError: {}, but EOF found", msg)
-            } else {
-                let (line, col) = (token.position.line, token.position.column);
-                write!(
-                    f,
-                    "[line {}, column {}] SyntaxError: {}, but '{:?}' found",
-                    line, col, msg, token
-                )
+        match self {
+            SyntaxError::LexError(err) => write!(f, "{:?}", err),
+            SyntaxError::ExpectExpression(t) => {
+                write_position(f, t)?;
+                write!(f, "expect an expression, but '{:?}' found", t)
+            }
+            SyntaxError::ExpectRightParen(t) => {
+                write_position(f, t)?;
+                write!(f, "expect an closing parenthesis, but '{:?}' found", t)
+            }
+            SyntaxError::ExpectSemicolon(t) => {
+                write_position(f, t)?;
+                write!(f, "expect an expression, but '{:?}' found", t)
+            }
+            SyntaxError::ExpectIdentifier(t) => {
+                write_position(f, t)?;
+                write!(f, "expect an expression, but '{:?}' found", t)
+            }
+            SyntaxError::InvalidAssignTarget(t) => {
+                write_position(f, t)?;
+                write!(f, "invalid assignment target")
             }
         }
     }
@@ -105,7 +109,7 @@ impl<'a> Parser<'a> {
     }
 
     fn box_current_token(&mut self) -> BoxToken {
-        if self.peeked.is_some() {
+        if self.peek().is_some() {
             Box::new(self.peeked.take().unwrap())
         } else {
             Box::new(Token::new(Position::default(), TokenKind::EOF))
@@ -271,8 +275,27 @@ impl<'a> Parser<'a> {
         Ok(left)
     }
 
+    fn assignment(&mut self) -> ParseResult<Expr> {
+        // parse left-value, it is also an expression, like x.y = 42
+        // we check if it is valid later
+        let l_value = self.equality()?;
+        if let Some(equal_tk) = self.advance_if_eq(TokenKind::EQUAL) {
+            if let Expr::Variable(v) = l_value {
+                // it is a valid assignment, so we continue to
+                // parse right value recursively.
+                let value = self.assignment()?;
+                return Ok(Expr::new_assign(v.name, value));
+            } else {
+                return Err(SyntaxError::InvalidAssignTarget(Box::new(
+                    equal_tk,
+                )));
+            }
+        }
+        Ok(l_value)
+    }
+
     fn expression(&mut self) -> ParseResult<Expr> {
-        self.equality()
+        self.assignment()
     }
 
     fn print_stmt(&mut self) -> ParseResult<Stmt> {

@@ -62,6 +62,7 @@ impl std::cmp::PartialEq for TokenKind {
     }
 }
 
+#[derive(Clone)]
 pub struct Token {
     pub position: Position,
     pub kind: TokenKind,

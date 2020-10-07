@@ -33,8 +33,12 @@ impl fmt::Display for SyntaxError {
             write!(f, "{:?}", err)
         } else {
             let (token, msg) = match self {
-                SyntaxError::ExpectExpression(t) => (Some(t), "expect a expression"),
-                SyntaxError::ExpectRightParen(t) => (Some(t), "expect a close parenthese"),
+                SyntaxError::ExpectExpression(t) => {
+                    (Some(t), "expect a expression")
+                }
+                SyntaxError::ExpectRightParen(t) => {
+                    (Some(t), "expect a close parenthese")
+                }
                 _ => (None, ""),
             };
             let token = token.unwrap();
@@ -148,14 +152,18 @@ impl<'a> Parser<'a> {
             if self.advance_if_eq(TokenKind::RIGHT_PAREN).is_some() {
                 return Ok(Expr::new_grouping(expr));
             } else {
-                return Err(SyntaxError::ExpectRightParen(self.box_current_token()));
+                return Err(SyntaxError::ExpectRightParen(
+                    self.box_current_token(),
+                ));
             }
         }
         Err(SyntaxError::ExpectExpression(self.box_current_token()))
     }
 
     fn unary(&mut self) -> ParseResult<Expr> {
-        if let Some(op) = self.advance_if_contains(&[TokenKind::MINUS, TokenKind::BANG]) {
+        if let Some(op) =
+            self.advance_if_contains(&[TokenKind::MINUS, TokenKind::BANG])
+        {
             let right = self.unary()?;
             Ok(Expr::new_unary(op, right))
         } else {
@@ -165,7 +173,9 @@ impl<'a> Parser<'a> {
 
     fn factor(&mut self) -> ParseResult<Expr> {
         let mut left = self.unary()?;
-        while let Some(op) = self.advance_if_contains(&[TokenKind::STAR, TokenKind::SLASH]) {
+        while let Some(op) =
+            self.advance_if_contains(&[TokenKind::STAR, TokenKind::SLASH])
+        {
             let right = self.unary()?;
             left = Expr::new_binary(op, left, right);
         }
@@ -174,7 +184,9 @@ impl<'a> Parser<'a> {
 
     fn term(&mut self) -> ParseResult<Expr> {
         let mut left = self.factor()?;
-        while let Some(op) = self.advance_if_contains(&[TokenKind::PLUS, TokenKind::MINUS]) {
+        while let Some(op) =
+            self.advance_if_contains(&[TokenKind::PLUS, TokenKind::MINUS])
+        {
             let right = self.factor()?;
             left = Expr::new_binary(op, left, right);
         }
@@ -197,7 +209,10 @@ impl<'a> Parser<'a> {
 
     fn equality(&mut self) -> ParseResult<Expr> {
         let mut left = self.comparison()?;
-        while let Some(op) = self.advance_if_contains(&[TokenKind::EQUAL_EQUAL, TokenKind::BANG_EQUAL]) {
+        while let Some(op) = self.advance_if_contains(&[
+            TokenKind::EQUAL_EQUAL,
+            TokenKind::BANG_EQUAL,
+        ]) {
             let right = self.comparison()?;
             left = Expr::new_binary(op, left, right);
         }

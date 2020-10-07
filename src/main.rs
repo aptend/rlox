@@ -3,6 +3,7 @@ use std::fs::File;
 use std::io::{self, BufRead, BufReader, Read, Write};
 
 use rlox::ast::ast_printer::AstPrint;
+use rlox::interpreter::Interpreter;
 use rlox::parser::Parser;
 use rlox::scanner::Scanner;
 
@@ -34,8 +35,12 @@ fn run(source: &str) {
     let scanner = Scanner::new(source);
     let mut parser = Parser::new(scanner);
     let expr = parser.parse();
+    let interpreter = Interpreter::new();
     match expr {
-        Ok(expr) => println!("{}", expr.print_ast()),
+        Ok(expr) => match interpreter.interpret(expr) {
+            Ok(val) => println!("{}", val),
+            Err(err) => println!("{}", err),
+        },
         Err(errs) => {
             for e in errs {
                 println!("{}", e);

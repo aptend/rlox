@@ -155,6 +155,25 @@ impl Interpret for BinaryExpr {
     }
 }
 
+trait Execute {
+    fn execute(&self) -> RuntimeResult<()>;
+}
+
+impl Execute for Stmt {
+    fn execute(&self) -> RuntimeResult<()> {
+        match self {
+            Stmt::Print(expr) => {
+                println!("{}", expr.interpret()?);
+                Ok(())
+            }
+            Stmt::Expression(expr) => {
+                expr.interpret()?;
+                Ok(())
+            }
+        }
+    }
+}
+
 pub struct Interpreter {}
 
 impl Interpreter {
@@ -162,7 +181,10 @@ impl Interpreter {
         Interpreter {}
     }
 
-    pub fn interpret(&self, expr: Expr) -> RuntimeResult<Value> {
-        expr.interpret()
+    pub fn interpret(&self, stmts: &[Stmt]) -> RuntimeResult<()> {
+        for stmt in stmts {
+            stmt.execute()?;
+        }
+        Ok(())
     }
 }

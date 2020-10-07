@@ -1,0 +1,7 @@
+print 12 + 56 * (-8 + 12);
+
+print "cancat strings:" + "hi" + "-gh";
+
+print 100 >= 99;
+
+print 2 + "hi"; // Runtime Error

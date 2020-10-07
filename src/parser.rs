@@ -8,7 +8,7 @@
 
 use std::fmt;
 
-use crate::ast::Expr;
+use crate::ast::{Expr, Stmt};
 use crate::scanner::*;
 
 type BoxToken = Box<Token>;
@@ -18,6 +18,7 @@ type ParseResult<T> = Result<T, SyntaxError>;
 pub enum SyntaxError {
     ExpectExpression(BoxToken),
     ExpectRightParen(BoxToken),
+    ExpectSemicolon(BoxToken),
     LexError(ScanError),
 }
 
@@ -38,6 +39,9 @@ impl fmt::Display for SyntaxError {
                 }
                 SyntaxError::ExpectRightParen(t) => {
                     (Some(t), "expect a close parenthese")
+                }
+                SyntaxError::ExpectSemicolon(t) => {
+                    (Some(t), "expect ';' after value")
                 }
                 _ => (None, ""),
             };
@@ -122,6 +126,14 @@ impl<'a> Parser<'a> {
             }
         }
         None
+    }
+
+    fn consume_semicolon(&mut self) -> ParseResult<()> {
+        if self.advance_if_eq(TokenKind::SEMICOLON).is_some() {
+            Ok(())
+        } else {
+            Err(SyntaxError::ExpectSemicolon(self.box_current_token()))
+        }
     }
 
     fn primary(&mut self) -> ParseResult<Expr> {
@@ -223,18 +235,37 @@ impl<'a> Parser<'a> {
         self.equality()
     }
 
-    pub fn parse(&mut self) -> Result<Expr, Vec<SyntaxError>> {
-        let result = self.expression().map_err(|e| {
-            let mut errors = std::mem::take(&mut self.errors);
-            errors.push(e);
-            errors
-        });
-        if result.is_err() {
-            result
-        } else if !self.errors.is_empty() {
+    fn print_stmt(&mut self) -> ParseResult<Stmt> {
+        let expr = self.expression()?;
+        self.consume_semicolon()?;
+        Ok(Stmt::new_print(expr))
+    }
+
+    fn expression_stmt(&mut self) -> ParseResult<Stmt> {
+        let expr = self.expression()?;
+        self.consume_semicolon()?;
+        Ok(Stmt::new_expr(expr))
+    }
+
+    fn statement(&mut self) -> ParseResult<Stmt> {
+        if self.advance_if_eq(TokenKind::PRINT).is_some() {
+            return self.print_stmt();
+        }
+        self.expression_stmt()
+    }
+
+    pub fn parse(&mut self) -> Result<Vec<Stmt>, Vec<SyntaxError>> {
+        let mut stmts = Vec::new();
+        while self.peek().is_some() {
+            match self.statement() {
+                Ok(stmt) => stmts.push(stmt),
+                Err(err) => self.errors.push(err)
+            }
+        }
+        if !self.errors.is_empty() {
             Err(std::mem::take(&mut self.errors))
         } else {
-            result
+            Ok(stmts)
         }
     }
 }

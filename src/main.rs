@@ -34,12 +34,11 @@ fn run_file(filename: String) {
 fn run(source: &str) {
     let scanner = Scanner::new(source);
     let mut parser = Parser::new(scanner);
-    let expr = parser.parse();
+    let stmts = parser.parse();
     let interpreter = Interpreter::new();
-    match expr {
-        Ok(expr) => match interpreter.interpret(expr) {
-            Ok(val) => println!("{}", val),
-            Err(err) => println!("{}", err),
+    match stmts {
+        Ok(stmts) => if let Err(err) = interpreter.interpret(&stmts) {
+            println!("{}", err);
         },
         Err(errs) => {
             for e in errs {

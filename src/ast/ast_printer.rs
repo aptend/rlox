@@ -29,7 +29,7 @@ impl AstPrint for Expr {
     }
 }
 
-impl AstPrint for Unary {
+impl AstPrint for UnaryExpr {
     fn print_ast(&self) -> String {
         format!("({:?} {})", self.op, self.right.print_ast())
     }
@@ -41,7 +41,7 @@ impl AstPrint for Grouping {
     }
 }
 
-impl AstPrint for Binary {
+impl AstPrint for BinaryExpr {
     fn print_ast(&self) -> String {
         format!(
             "({:?} {} {})",
@@ -58,16 +58,14 @@ mod test {
     use crate::scanner::*;
     #[test]
     fn test_ast_printer() {
-        let expression = Expr::Binary(Binary {
-            left: Box::new(Expr::Unary(Unary {
-                op: Token::with_kind(TokenKind::MINUS),
-                right: Box::new(Expr::Literal(Literal::Number(123.0))),
-            })),
-            op: Token::with_kind(TokenKind::STAR),
-            right: Box::new(Expr::Grouping(Grouping {
-                expr: Box::new(Expr::Literal(Literal::Number(45.67))),
-            })),
-        });
+        let expression = Expr::new_binary(
+            Token::with_kind(TokenKind::STAR),
+            Expr::new_unary(
+                Token::with_kind(TokenKind::MINUS),
+                Expr::new_number_literal(123.0),
+            ),
+            Expr::new_grouping(Expr::new_number_literal(45.67)),
+        );
 
         assert_eq!("(* (- 123) 45.67)", expression.print_ast());
     }

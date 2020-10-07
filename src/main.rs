@@ -2,7 +2,7 @@ use std::env;
 use std::fs::File;
 use std::io::{self, BufRead, BufReader, Read, Write};
 
-use rlox::ast::ast_printer::AstPrint;
+// use rlox::ast::ast_printer::AstPrint;
 use rlox::interpreter::Interpreter;
 use rlox::parser::Parser;
 use rlox::scanner::Scanner;

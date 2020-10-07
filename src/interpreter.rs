@@ -92,7 +92,7 @@ impl Interpret for Grouping {
     }
 }
 
-impl Interpret for Unary {
+impl Interpret for UnaryExpr {
     fn interpret(&self) -> RuntimeResult<Value> {
         let val = self.right.interpret()?;
         match &self.op.kind {
@@ -111,7 +111,7 @@ impl Interpret for Unary {
     }
 }
 
-impl Interpret for Binary {
+impl Interpret for BinaryExpr {
     fn interpret(&self) -> RuntimeResult<Value> {
         let left_val = self.left.interpret()?;
         let right_val = self.right.interpret()?;

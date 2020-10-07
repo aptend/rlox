@@ -1,7 +1,7 @@
 use crate::scanner::Token;
 pub enum Expr {
-    Unary(Unary),
-    Binary(Binary),
+    Unary(UnaryExpr),
+    Binary(BinaryExpr),
     Grouping(Grouping),
     Literal(Literal),
 }
@@ -20,7 +20,7 @@ impl Expr {
     }
 
     pub fn new_binary(op: Token, left: Expr, right: Expr) -> Expr {
-        Expr::Binary(Binary {
+        Expr::Binary(BinaryExpr {
             left: Box::new(left),
             op,
             right: Box::new(right),
@@ -28,7 +28,7 @@ impl Expr {
     }
 
     pub fn new_unary(op: Token, right: Expr) -> Expr {
-        Expr::Unary(Unary {
+        Expr::Unary(UnaryExpr {
             op,
             right: Box::new(right),
         })
@@ -47,12 +47,12 @@ impl std::default::Default for Expr {
     }
 }
 
-pub struct Unary {
+pub struct UnaryExpr {
     pub op: Token,
     pub right: Box<Expr>,
 }
 
-pub struct Binary {
+pub struct BinaryExpr {
     pub left: Box<Expr>,
     pub op: Token,
     pub right: Box<Expr>,

@@ -5,6 +5,11 @@ var answer = 42;
 print question;
 print answer;
 
+var a = 1;
+var b = 41;
+
+print a + b;
+
 // Runtime Error
 //var = 99 + + 12i; // synchronize skips '+ +' error
 //var;

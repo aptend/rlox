@@ -1,6 +1,7 @@
 use crate::ast::*;
 use crate::scanner::{Token, TokenKind};
 
+use std::collections::HashMap;
 use std::fmt;
 
 #[derive(Clone, Debug, PartialEq)]
@@ -43,16 +44,25 @@ type RuntimeResult<T> = Result<T, RuntimeError>;
 pub enum RuntimeError {
     UnaryMismatchedType(BoxToken),
     BinaryMismatchedType(BoxToken),
+    UndefinedIdentifier(BoxToken),
 }
 
 impl fmt::Display for RuntimeError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let (token, msg) = match self {
+        let mut msg = String::new();
+        let token = match self {
             RuntimeError::UnaryMismatchedType(token) => {
-                (token, "Operand of unary op '-' must be a number.")
+                msg.push_str("Operand of unary op '-' must be a number.");
+                token
             }
             RuntimeError::BinaryMismatchedType(token) => {
-                (token, "Operands must be numbers")
+                msg.push_str("Operands must be numbers");
+                token
+            }
+            RuntimeError::UndefinedIdentifier(token) => {
+                msg.push_str("Undefined identifier: ");
+                msg.push_str(token.string_ref().unwrap());
+                token
             }
         };
         let (line, col) = (token.position.line, token.position.column);
@@ -61,23 +71,34 @@ impl fmt::Display for RuntimeError {
 }
 
 trait Interpret {
-    fn interpret(&self) -> RuntimeResult<Value>;
+    fn interpret(&self, interpreter: &mut Interpreter) -> RuntimeResult<Value>;
 }
 
 impl Interpret for Expr {
-    fn interpret(&self) -> RuntimeResult<Value> {
+    fn interpret(&self, interpreter: &mut Interpreter) -> RuntimeResult<Value> {
         match self {
-            Expr::Literal(l) => l.interpret(),
-            Expr::Unary(u) => u.interpret(),
-            Expr::Binary(b) => b.interpret(),
-            Expr::Grouping(g) => g.interpret(),
-            Expr::Variable(v) => Ok(Value::Nil),
+            Expr::Literal(l) => l.interpret(interpreter),
+            Expr::Unary(u) => u.interpret(interpreter),
+            Expr::Binary(b) => b.interpret(interpreter),
+            Expr::Grouping(g) => g.interpret(interpreter),
+            Expr::Variable(v) => v.interpret(interpreter),
+        }
+    }
+}
+
+impl Interpret for VariableExpr {
+    fn interpret(&self, interpreter: &mut Interpreter) -> RuntimeResult<Value> {
+        match interpreter.env.get(self.token.string_ref().unwrap()) {
+            Some(v) => Ok(v.clone()),
+            None => Err(RuntimeError::UndefinedIdentifier(Box::new(
+                self.token.clone(),
+            ))),
         }
     }
 }
 
 impl Interpret for Literal {
-    fn interpret(&self) -> RuntimeResult<Value> {
+    fn interpret(&self, _: &mut Interpreter) -> RuntimeResult<Value> {
         match self {
             Literal::Nil => Ok(Value::Nil),
             Literal::Boolean(b) => Ok(Value::Boolean(*b)),
@@ -88,14 +109,14 @@ impl Interpret for Literal {
 }
 
 impl Interpret for Grouping {
-    fn interpret(&self) -> RuntimeResult<Value> {
-        self.expr.interpret()
+    fn interpret(&self, interpreter: &mut Interpreter) -> RuntimeResult<Value> {
+        self.expr.interpret(interpreter)
     }
 }
 
 impl Interpret for UnaryExpr {
-    fn interpret(&self) -> RuntimeResult<Value> {
-        let val = self.right.interpret()?;
+    fn interpret(&self, interpreter: &mut Interpreter) -> RuntimeResult<Value> {
+        let val = self.right.interpret(interpreter)?;
         match &self.op.kind {
             TokenKind::BANG => Ok(Value::Boolean(!val.is_truthy())),
             TokenKind::MINUS => {
@@ -113,9 +134,9 @@ impl Interpret for UnaryExpr {
 }
 
 impl Interpret for BinaryExpr {
-    fn interpret(&self) -> RuntimeResult<Value> {
-        let left_val = self.left.interpret()?;
-        let right_val = self.right.interpret()?;
+    fn interpret(&self, interpreter: &mut Interpreter) -> RuntimeResult<Value> {
+        let left_val = self.left.interpret(interpreter)?;
+        let right_val = self.right.interpret(interpreter)?;
         match (&self.op.kind, left_val, right_val) {
             (TokenKind::PLUS, Value::String(mut s1), Value::String(s2)) => {
                 s1 += &s2;
@@ -157,43 +178,45 @@ impl Interpret for BinaryExpr {
 }
 
 trait Execute {
-    fn execute(&self) -> RuntimeResult<()>;
+    fn execute(&self, interpreter: &mut Interpreter) -> RuntimeResult<()>;
 }
 
 impl Execute for Stmt {
-    fn execute(&self) -> RuntimeResult<()> {
+    fn execute(&self, interpreter: &mut Interpreter) -> RuntimeResult<()> {
         match self {
             Stmt::Print(expr) => {
-                println!("{}", expr.interpret()?);
+                println!("{}", expr.interpret(interpreter)?);
                 Ok(())
             }
             Stmt::Expression(expr) => {
-                expr.interpret()?;
+                expr.interpret(interpreter)?;
                 Ok(())
             }
             Stmt::Var(v) => {
-                let init_val = v.init.interpret()?;
-                println!(
-                    "set '{}' with {:?}",
-                    v.name.string_ref().unwrap(),
-                    init_val
-                );
+                let init_val = v.init.interpret(interpreter)?;
+                interpreter
+                    .env
+                    .insert(v.name.string_ref().unwrap().clone(), init_val);
                 Ok(())
             }
         }
     }
 }
 
-pub struct Interpreter {}
+pub struct Interpreter {
+    env: HashMap<String, Value>,
+}
 
 impl Interpreter {
     pub fn new() -> Self {
-        Interpreter {}
+        Interpreter {
+            env: HashMap::new(),
+        }
     }
 
-    pub fn interpret(&self, stmts: &[Stmt]) -> RuntimeResult<()> {
+    pub fn interpret(&mut self, stmts: &[Stmt]) -> RuntimeResult<()> {
         for stmt in stmts {
-            stmt.execute()?;
+            stmt.execute(self)?;
         }
         Ok(())
     }

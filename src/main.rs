@@ -37,9 +37,11 @@ fn run(source: &str) {
     let stmts = parser.parse();
     let interpreter = Interpreter::new();
     match stmts {
-        Ok(stmts) => if let Err(err) = interpreter.interpret(&stmts) {
-            println!("{}", err);
-        },
+        Ok(stmts) => {
+            if let Err(err) = interpreter.interpret(&stmts) {
+                println!("{}", err);
+            }
+        }
         Err(errs) => {
             for e in errs {
                 println!("{}", e);

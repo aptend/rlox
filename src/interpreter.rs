@@ -71,6 +71,7 @@ impl Interpret for Expr {
             Expr::Unary(u) => u.interpret(),
             Expr::Binary(b) => b.interpret(),
             Expr::Grouping(g) => g.interpret(),
+            Expr::Variable(v) => Ok(Value::Nil),
         }
     }
 }
@@ -168,6 +169,15 @@ impl Execute for Stmt {
             }
             Stmt::Expression(expr) => {
                 expr.interpret()?;
+                Ok(())
+            }
+            Stmt::Var(v) => {
+                let init_val = v.init.interpret()?;
+                println!(
+                    "set '{}' with {:?}",
+                    v.name.string_ref().unwrap(),
+                    init_val
+                );
                 Ok(())
             }
         }

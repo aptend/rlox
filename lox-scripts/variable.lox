@@ -1,0 +1,10 @@
+var question = "what is the answer?";
+
+var answer = 42;
+
+print question;
+print answer;
+
+// Runtime Error
+//var = 99 + + 12i; // synchronize skips '+ +' error
+//var;

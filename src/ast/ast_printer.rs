@@ -1,5 +1,4 @@
 use super::expr::*;
-
 pub trait AstPrint {
     fn print_ast(&self) -> String;
 }
@@ -25,6 +24,7 @@ impl AstPrint for Expr {
             Expr::Unary(v) => v.print_ast(),
             Expr::Binary(v) => v.print_ast(),
             Expr::Grouping(v) => v.print_ast(),
+            Expr::Variable(v) => v.print_ast(),
         }
     }
 }
@@ -38,6 +38,12 @@ impl AstPrint for UnaryExpr {
 impl AstPrint for Grouping {
     fn print_ast(&self) -> String {
         self.expr.print_ast()
+    }
+}
+
+impl AstPrint for VariableExpr {
+    fn print_ast(&self) -> String {
+        self.token.string_ref().unwrap().to_owned()
     }
 }
 

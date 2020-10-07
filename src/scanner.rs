@@ -80,6 +80,14 @@ impl Token {
             kind,
         }
     }
+
+    pub fn string_ref(&self) -> Option<&String> {
+        match &self.kind {
+            TokenKind::IDENTIFIER(s) => Some(s),
+            TokenKind::STRING(s) => Some(s),
+            _ => None,
+        }
+    }
 }
 
 impl fmt::Debug for Token {
@@ -96,7 +104,8 @@ impl fmt::Debug for Token {
             TokenKind::BANG_EQUAL => write!(f, "!="),
             TokenKind::GREATER => write!(f, ">"),
             TokenKind::GREATER_EQUAL => write!(f, ">="),
-            other => write!(f, "token {:?}", other),
+            TokenKind::SEMICOLON => write!(f, ";"),
+            other => write!(f, "{:?}", other),
         }
     }
 }

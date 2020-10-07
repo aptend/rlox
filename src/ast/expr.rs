@@ -4,6 +4,7 @@ pub enum Expr {
     Binary(BinaryExpr),
     Grouping(Grouping),
     Literal(Literal),
+    Variable(VariableExpr),
 }
 
 impl Expr {
@@ -39,6 +40,10 @@ impl Expr {
             expr: Box::new(expr),
         })
     }
+
+    pub fn new_variable(token: Token) -> Expr {
+        Expr::Variable(VariableExpr { token })
+    }
 }
 
 impl std::default::Default for Expr {
@@ -67,4 +72,8 @@ pub enum Literal {
     String(String),
     Number(f64),
     Boolean(bool),
+}
+
+pub struct VariableExpr {
+    pub token: Token,
 }

@@ -19,6 +19,7 @@ pub enum SyntaxError {
     ExpectExpression(BoxToken),
     ExpectRightParen(BoxToken),
     ExpectSemicolon(BoxToken),
+    ExpectIdentifier(BoxToken),
     LexError(ScanError),
 }
 
@@ -42,6 +43,9 @@ impl fmt::Display for SyntaxError {
                 }
                 SyntaxError::ExpectSemicolon(t) => {
                     (Some(t), "expect ';' after value")
+                }
+                SyntaxError::ExpectIdentifier(t) => {
+                    (Some(t), "expect an identifier")
                 }
                 _ => (None, ""),
             };
@@ -136,6 +140,34 @@ impl<'a> Parser<'a> {
         }
     }
 
+    fn synchronize(&mut self) {
+        loop {
+            if let Some(token) = self.peek() {
+                match &token.kind {
+                    TokenKind::SEMICOLON => {
+                        self.advance();
+                        return;
+                    }
+                    TokenKind::CLASS
+                    | TokenKind::FUN
+                    | TokenKind::VAR
+                    | TokenKind::FOR
+                    | TokenKind::IF
+                    | TokenKind::WHILE
+                    | TokenKind::PRINT
+                    | TokenKind::RETURN => return,
+                    _ => {
+                        self.advance();
+                    }
+                }
+            } else {
+                break;
+            }
+        }
+    }
+
+    // ---- expression recognition ----
+
     fn primary(&mut self) -> ParseResult<Expr> {
         if let Some(t) = self.advance_if_eq(TokenKind::NUMBER(0.0)) {
             if let TokenKind::NUMBER(f) = t.kind {
@@ -143,6 +175,7 @@ impl<'a> Parser<'a> {
             }
         }
         if let Some(t) = self.advance_if_eq(TokenKind::STRING(String::new())) {
+            // move string out of token before droping it
             if let TokenKind::STRING(s) = t.kind {
                 return Ok(Expr::new_string_literal(s));
             }
@@ -157,6 +190,13 @@ impl<'a> Parser<'a> {
 
         if self.advance_if_eq(TokenKind::NIL).is_some() {
             return Ok(Expr::default());
+        }
+
+        if let Some(t) =
+            self.advance_if_eq(TokenKind::IDENTIFIER(String::new()))
+        {
+            // move this token into expr
+            return Ok(Expr::new_variable(t));
         }
 
         if self.advance_if_eq(TokenKind::LEFT_PAREN).is_some() {
@@ -254,12 +294,37 @@ impl<'a> Parser<'a> {
         self.expression_stmt()
     }
 
+    fn var_decl_stmt(&mut self) -> ParseResult<Stmt> {
+        if let Some(token) =
+            self.advance_if_eq(TokenKind::IDENTIFIER(String::new()))
+        {
+            let mut init = Expr::default();
+            if self.advance_if_eq(TokenKind::EQUAL).is_some() {
+                init = self.expression()?;
+            }
+            self.consume_semicolon()?;
+            Ok(Stmt::new_variable(token, init))
+        } else {
+            Err(SyntaxError::ExpectIdentifier(self.box_current_token()))
+        }
+    }
+
+    fn declaration(&mut self) -> ParseResult<Stmt> {
+        if self.advance_if_eq(TokenKind::VAR).is_some() {
+            return self.var_decl_stmt();
+        }
+        self.statement()
+    }
+
     pub fn parse(&mut self) -> Result<Vec<Stmt>, Vec<SyntaxError>> {
         let mut stmts = Vec::new();
         while self.peek().is_some() {
-            match self.statement() {
+            match self.declaration() {
                 Ok(stmt) => stmts.push(stmt),
-                Err(err) => self.errors.push(err)
+                Err(err) => {
+                    self.errors.push(err);
+                    self.synchronize();
+                }
             }
         }
         if !self.errors.is_empty() {

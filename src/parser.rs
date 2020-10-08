@@ -302,7 +302,7 @@ impl<'a> Parser<'a> {
     fn and_expr(&mut self) -> ParseResult<Expr> {
         let mut left = self.equality()?;
         while let Some(op) = self.advance_if_eq(&TokenKind::AND) {
-            let right = self.comparison()?;
+            let right = self.equality()?;
             left = Expr::new_logical(op, left, right);
         }
         Ok(left)
@@ -311,7 +311,7 @@ impl<'a> Parser<'a> {
     fn or_expr(&mut self) -> ParseResult<Expr> {
         let mut left = self.and_expr()?;
         while let Some(op) = self.advance_if_eq(&TokenKind::OR) {
-            let right = self.comparison()?;
+            let right = self.and_expr()?;
             left = Expr::new_logical(op, left, right);
         }
         Ok(left)

@@ -3,8 +3,11 @@ if (a > 100) {
   print "a is greater than 100";
 }
 else {
-  print "a is less than 100";
+  print "a is less than 100"; // print
 }
 
-var b = 100 > 99 and a < 20 or "true";
-if (b) print "b is true";
+var b = false or 100 > 99 and a < 9 == true;
+if (b) print "b is true"; // no print;
+
+print "hi" or 2; // "hi".
+print nil or "yes"; // "yes".

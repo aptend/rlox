@@ -196,23 +196,20 @@ impl Interpret for BinaryExpr {
 
 impl Interpret for LogicalExpr {
     fn interpret(&self, interpreter: &mut Interpreter) -> RuntimeResult<Value> {
+        let left_branch = self.left.interpret(interpreter)?;
         match &self.op.kind {
             TokenKind::OR => {
-                if self.left.interpret(interpreter)?.is_truthy() {
-                    Ok(Value::Boolean(true))
+                if left_branch.is_truthy() {
+                    Ok(left_branch)
                 } else {
-                    Ok(Value::Boolean(
-                        self.right.interpret(interpreter)?.is_truthy(),
-                    ))
+                    self.right.interpret(interpreter)
                 }
             }
             TokenKind::AND => {
-                if !self.left.interpret(interpreter)?.is_truthy() {
-                    Ok(Value::Boolean(false))
+                if !left_branch.is_truthy() {
+                    Ok(left_branch)
                 } else {
-                    Ok(Value::Boolean(
-                        self.right.interpret(interpreter)?.is_truthy(),
-                    ))
+                    self.right.interpret(interpreter)
                 }
             }
             _ => unreachable!(),

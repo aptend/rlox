@@ -6,7 +6,6 @@ use std::collections::HashMap;
 use std::fmt;
 use std::rc::Rc;
 
-
 // it is lame to copy Value in every calculation step during treewalk
 // use rc to rescure? but, whatever for now
 #[derive(Clone, Debug, PartialEq)]
@@ -218,6 +217,7 @@ impl Execute for Stmt {
                 interpreter.env.define(&v.name, init_val)
             }
             Stmt::Block(b) => b.execute(interpreter),
+            Stmt::If(i) => i.execute(interpreter),
         }
     }
 }
@@ -233,6 +233,18 @@ impl Execute for BlockStmt {
         }
         interpreter.pop_env();
         Ok(())
+    }
+}
+
+impl Execute for IfStmt {
+    fn execute(&self, interpreter: &mut Interpreter) -> RuntimeResult<()> {
+        if self.cond.interpret(interpreter)?.is_truthy() {
+            self.taken.execute(interpreter)
+        } else if let Some(ref stmt) = self.no_token {
+            stmt.execute(interpreter)
+        } else {
+            Ok(())
+        }
     }
 }
 
@@ -271,7 +283,7 @@ impl std::default::Default for Environment {
 impl std::clone::Clone for Environment {
     fn clone(&self) -> Self {
         Environment {
-            inner: self.inner.clone()
+            inner: self.inner.clone(),
         }
     }
 }

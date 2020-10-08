@@ -18,6 +18,7 @@ type ParseResult<T> = Result<T, SyntaxError>;
 #[derive(Debug)]
 pub enum SyntaxError {
     ExpectExpression(BoxToken),
+    ExpectLeftParen(BoxToken),
     ExpectRightParen(BoxToken),
     ExpectRightBrace(BoxToken),
     ExpectSemicolon(BoxToken),
@@ -49,13 +50,21 @@ impl fmt::Display for SyntaxError {
                 write_position(f, t)?;
                 write!(f, "expect an expression, but '{:?}' found", t)
             }
+            SyntaxError::ExpectLeftParen(t) => {
+                write_position(f, t)?;
+                write!(f, "expect an opening parenthesis, but '{:?}' found", t)
+            }
             SyntaxError::ExpectRightParen(t) => {
                 write_position(f, t)?;
                 write!(f, "expect an closing parenthesis, but '{:?}' found", t)
-            },
+            }
             SyntaxError::ExpectRightBrace(t) => {
                 write_position(f, t)?;
-                write!(f, "expect an closing brace after block, but '{:?}' found", t)
+                write!(
+                    f,
+                    "expect an closing brace after block, but '{:?}' found",
+                    t
+                )
             }
             SyntaxError::ExpectSemicolon(t) => {
                 write_position(f, t)?;
@@ -121,9 +130,9 @@ impl<'a> Parser<'a> {
         }
     }
 
-    fn advance_if_eq(&mut self, kind: TokenKind) -> Option<Token> {
+    fn advance_if_eq(&mut self, kind: &TokenKind) -> Option<Token> {
         if let Some(token) = self.peek() {
-            if token.kind == kind {
+            if &token.kind == kind {
                 return self.advance();
             }
         }
@@ -141,11 +150,24 @@ impl<'a> Parser<'a> {
         None
     }
 
-    fn consume_semicolon(&mut self) -> ParseResult<()> {
-        if self.advance_if_eq(TokenKind::SEMICOLON).is_some() {
+    fn consume_or_err(&mut self, kind: &TokenKind) -> ParseResult<()> {
+        if self.advance_if_eq(kind).is_some() {
             Ok(())
         } else {
-            Err(SyntaxError::ExpectSemicolon(self.box_current_token()))
+            let tk = self.box_current_token();
+            match kind {
+                TokenKind::SEMICOLON => Err(SyntaxError::ExpectSemicolon(tk)),
+                TokenKind::RIGHT_BRACE => {
+                    Err(SyntaxError::ExpectRightBrace(tk))
+                }
+
+                TokenKind::RIGHT_PAREN => {
+                    Err(SyntaxError::ExpectRightParen(tk))
+                }
+
+                TokenKind::LEFT_PAREN => Err(SyntaxError::ExpectLeftParen(tk)),
+                _ => unimplemented!(),
+            }
         }
     }
 
@@ -180,45 +202,40 @@ impl<'a> Parser<'a> {
     /// ----------------------------------------------------------------------
 
     fn primary(&mut self) -> ParseResult<Expr> {
-        if let Some(t) = self.advance_if_eq(TokenKind::NUMBER(0.0)) {
+        if let Some(t) = self.advance_if_eq(&TokenKind::NUMBER(0.0)) {
             if let TokenKind::NUMBER(f) = t.kind {
                 return Ok(Expr::new_number_literal(f));
             }
         }
-        if let Some(t) = self.advance_if_eq(TokenKind::STRING(String::new())) {
+        if let Some(t) = self.advance_if_eq(&TokenKind::STRING(String::new())) {
             // move string out of token before droping it
             if let TokenKind::STRING(s) = t.kind {
                 return Ok(Expr::new_string_literal(s));
             }
         }
-        if self.advance_if_eq(TokenKind::TRUE).is_some() {
+        if self.advance_if_eq(&TokenKind::TRUE).is_some() {
             return Ok(Expr::new_bool_literal(true));
         }
 
-        if self.advance_if_eq(TokenKind::FALSE).is_some() {
+        if self.advance_if_eq(&TokenKind::FALSE).is_some() {
             return Ok(Expr::new_bool_literal(false));
         }
 
-        if self.advance_if_eq(TokenKind::NIL).is_some() {
+        if self.advance_if_eq(&TokenKind::NIL).is_some() {
             return Ok(Expr::default());
         }
 
         if let Some(t) =
-            self.advance_if_eq(TokenKind::IDENTIFIER(String::new()))
+            self.advance_if_eq(&TokenKind::IDENTIFIER(String::new()))
         {
             // move this token into expr
             return Ok(Expr::new_variable(t));
         }
 
-        if self.advance_if_eq(TokenKind::LEFT_PAREN).is_some() {
+        if self.advance_if_eq(&TokenKind::LEFT_PAREN).is_some() {
             let expr = self.expression()?;
-            if self.advance_if_eq(TokenKind::RIGHT_PAREN).is_some() {
-                return Ok(Expr::new_grouping(expr));
-            } else {
-                return Err(SyntaxError::ExpectRightParen(
-                    self.box_current_token(),
-                ));
-            }
+            self.consume_or_err(&TokenKind::RIGHT_PAREN)?;
+            return Ok(Expr::new_grouping(expr));
         }
         Err(SyntaxError::ExpectExpression(self.box_current_token()))
     }
@@ -286,7 +303,7 @@ impl<'a> Parser<'a> {
         // parse left-value, it is also an expression, like x.y = 42
         // we check if it is valid later
         let l_value = self.equality()?;
-        if let Some(equal_tk) = self.advance_if_eq(TokenKind::EQUAL) {
+        if let Some(equal_tk) = self.advance_if_eq(&TokenKind::EQUAL) {
             if let Expr::Variable(v) = l_value {
                 // it is a valid assignment, so we continue to
                 // parse right value recursively.
@@ -305,21 +322,19 @@ impl<'a> Parser<'a> {
         self.assignment()
     }
 
-
-
     /// ----------------------------------------------------------------------
     /// ---- statement recognition ------------------------------------------
     /// ----------------------------------------------------------------------
 
     fn print_stmt(&mut self) -> ParseResult<Stmt> {
         let expr = self.expression()?;
-        self.consume_semicolon()?;
+        self.consume_or_err(&TokenKind::SEMICOLON)?;
         Ok(Stmt::new_print(expr))
     }
 
     fn expression_stmt(&mut self) -> ParseResult<Stmt> {
         let expr = self.expression()?;
-        self.consume_semicolon()?;
+        self.consume_or_err(&TokenKind::SEMICOLON)?;
         Ok(Stmt::new_expr(expr))
     }
 
@@ -341,18 +356,30 @@ impl<'a> Parser<'a> {
             }
         }
 
-        if self.advance_if_eq(TokenKind::RIGHT_BRACE).is_none() {
-            return Err(SyntaxError::ExpectRightBrace(self.box_current_token()))
+        self.consume_or_err(&TokenKind::RIGHT_BRACE)?;
+        Ok(Stmt::new_block(stmts))
+    }
+
+    fn if_statement(&mut self) -> ParseResult<Stmt> {
+        self.consume_or_err(&TokenKind::LEFT_PAREN)?;
+        let cond = self.expression()?;
+        self.consume_or_err(&TokenKind::RIGHT_PAREN)?;
+        let taken = self.statement()?;
+        if self.advance_if_eq(&TokenKind::ELSE).is_some() {
+            Ok(Stmt::new_if(cond, taken, Some(self.statement()?)))
         } else {
-            Ok(Stmt::new_block(stmts))
+            Ok(Stmt::new_if(cond, taken, None))
         }
     }
 
     fn statement(&mut self) -> ParseResult<Stmt> {
-        if self.advance_if_eq(TokenKind::PRINT).is_some() {
+        if self.advance_if_eq(&TokenKind::PRINT).is_some() {
             return self.print_stmt();
         }
-        if self.advance_if_eq(TokenKind::LEFT_BRACE).is_some() {
+        if self.advance_if_eq(&TokenKind::IF).is_some() {
+            return self.if_statement();
+        }
+        if self.advance_if_eq(&TokenKind::LEFT_BRACE).is_some() {
             return self.block_stmt();
         }
         self.expression_stmt()
@@ -360,13 +387,13 @@ impl<'a> Parser<'a> {
 
     fn var_decl_stmt(&mut self) -> ParseResult<Stmt> {
         if let Some(token) =
-            self.advance_if_eq(TokenKind::IDENTIFIER(String::new()))
+            self.advance_if_eq(&TokenKind::IDENTIFIER(String::new()))
         {
             let mut init = Expr::default();
-            if self.advance_if_eq(TokenKind::EQUAL).is_some() {
+            if self.advance_if_eq(&TokenKind::EQUAL).is_some() {
                 init = self.expression()?;
             }
-            self.consume_semicolon()?;
+            self.consume_or_err(&TokenKind::SEMICOLON)?;
             Ok(Stmt::new_variable(token, init))
         } else {
             Err(SyntaxError::ExpectIdentifier(self.box_current_token()))
@@ -374,7 +401,7 @@ impl<'a> Parser<'a> {
     }
 
     fn declaration(&mut self) -> ParseResult<Stmt> {
-        if self.advance_if_eq(TokenKind::VAR).is_some() {
+        if self.advance_if_eq(&TokenKind::VAR).is_some() {
             return self.var_decl_stmt();
         }
         self.statement()

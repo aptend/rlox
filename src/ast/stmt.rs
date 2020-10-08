@@ -6,6 +6,7 @@ pub enum Stmt {
     Print(Expr),
     Var(VariableStmt),
     Block(BlockStmt),
+    If(IfStmt),
 }
 
 impl std::default::Default for Stmt {
@@ -23,24 +24,33 @@ impl Stmt {
     }
 
     pub fn new_variable(name: Token, init: Expr) -> Stmt {
-        Stmt::Var(VariableStmt {
-            name,
-            init: Box::new(init),
-        })
+        Stmt::Var(VariableStmt { name, init })
     }
 
     pub fn new_block(stmts: Vec<Stmt>) -> Stmt {
-        Stmt::Block(BlockStmt {
-            stmts
+        Stmt::Block(BlockStmt { stmts })
+    }
+
+    pub fn new_if(cond: Expr, taken: Stmt, no_taken: Option<Stmt>) -> Stmt {
+        Stmt::If(IfStmt {
+            cond,
+            taken: Box::new(taken),
+            no_token: no_taken.map(|s| Box::new(s)),
         })
     }
 }
 
 pub struct VariableStmt {
     pub name: Token,
-    pub init: Box<Expr>,
+    pub init: Expr,
 }
 
 pub struct BlockStmt {
-    pub stmts: Vec<Stmt>
+    pub stmts: Vec<Stmt>,
+}
+
+pub struct IfStmt {
+    pub cond: Expr,
+    pub taken: Box<Stmt>,
+    pub no_token: Option<Box<Stmt>>,
 }

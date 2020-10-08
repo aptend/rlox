@@ -19,6 +19,7 @@ type ParseResult<T> = Result<T, SyntaxError>;
 pub enum SyntaxError {
     ExpectExpression(BoxToken),
     ExpectRightParen(BoxToken),
+    ExpectRightBrace(BoxToken),
     ExpectSemicolon(BoxToken),
     ExpectIdentifier(BoxToken),
     InvalidAssignTarget(BoxToken),
@@ -51,14 +52,18 @@ impl fmt::Display for SyntaxError {
             SyntaxError::ExpectRightParen(t) => {
                 write_position(f, t)?;
                 write!(f, "expect an closing parenthesis, but '{:?}' found", t)
+            },
+            SyntaxError::ExpectRightBrace(t) => {
+                write_position(f, t)?;
+                write!(f, "expect an closing brace after block, but '{:?}' found", t)
             }
             SyntaxError::ExpectSemicolon(t) => {
                 write_position(f, t)?;
-                write!(f, "expect an expression, but '{:?}' found", t)
+                write!(f, "expect a ';' after statement, but '{:?}' found", t)
             }
             SyntaxError::ExpectIdentifier(t) => {
                 write_position(f, t)?;
-                write!(f, "expect an expression, but '{:?}' found", t)
+                write!(f, "expect an identifier, but '{:?}' found", t)
             }
             SyntaxError::InvalidAssignTarget(t) => {
                 write_position(f, t)?;
@@ -170,7 +175,9 @@ impl<'a> Parser<'a> {
         }
     }
 
-    // ---- expression recognition ----
+    /// ----------------------------------------------------------------------
+    /// ---- expression recognition ------------------------------------------
+    /// ----------------------------------------------------------------------
 
     fn primary(&mut self) -> ParseResult<Expr> {
         if let Some(t) = self.advance_if_eq(TokenKind::NUMBER(0.0)) {
@@ -298,6 +305,12 @@ impl<'a> Parser<'a> {
         self.assignment()
     }
 
+
+
+    /// ----------------------------------------------------------------------
+    /// ---- statement recognition ------------------------------------------
+    /// ----------------------------------------------------------------------
+
     fn print_stmt(&mut self) -> ParseResult<Stmt> {
         let expr = self.expression()?;
         self.consume_semicolon()?;
@@ -310,9 +323,37 @@ impl<'a> Parser<'a> {
         Ok(Stmt::new_expr(expr))
     }
 
+    fn block_stmt(&mut self) -> ParseResult<Stmt> {
+        let mut stmts = Vec::new();
+
+        while let Some(tk) = self.peek() {
+            // if there is a missing right brace,
+            // the SyntaxError will be reported at EOF, akward.
+            if TokenKind::RIGHT_BRACE == tk.kind {
+                break;
+            }
+            match self.declaration() {
+                Ok(stmt) => stmts.push(stmt),
+                Err(err) => {
+                    self.errors.push(err);
+                    self.synchronize();
+                }
+            }
+        }
+
+        if self.advance_if_eq(TokenKind::RIGHT_BRACE).is_none() {
+            return Err(SyntaxError::ExpectRightBrace(self.box_current_token()))
+        } else {
+            Ok(Stmt::new_block(stmts))
+        }
+    }
+
     fn statement(&mut self) -> ParseResult<Stmt> {
         if self.advance_if_eq(TokenKind::PRINT).is_some() {
             return self.print_stmt();
+        }
+        if self.advance_if_eq(TokenKind::LEFT_BRACE).is_some() {
+            return self.block_stmt();
         }
         self.expression_stmt()
     }

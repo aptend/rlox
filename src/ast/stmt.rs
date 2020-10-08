@@ -5,6 +5,7 @@ pub enum Stmt {
     Expression(Expr),
     Print(Expr),
     Var(VariableStmt),
+    Block(BlockStmt),
 }
 
 impl std::default::Default for Stmt {
@@ -27,9 +28,19 @@ impl Stmt {
             init: Box::new(init),
         })
     }
+
+    pub fn new_block(stmts: Vec<Stmt>) -> Stmt {
+        Stmt::Block(BlockStmt {
+            stmts
+        })
+    }
 }
 
 pub struct VariableStmt {
     pub name: Token,
     pub init: Box<Expr>,
+}
+
+pub struct BlockStmt {
+    pub stmts: Vec<Stmt>
 }

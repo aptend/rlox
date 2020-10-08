@@ -217,7 +217,22 @@ impl Execute for Stmt {
                 let init_val = v.init.interpret(interpreter)?;
                 interpreter.env.define(&v.name, init_val)
             }
+            Stmt::Block(b) => b.execute(interpreter),
         }
+    }
+}
+
+impl Execute for BlockStmt {
+    fn execute(&self, interpreter: &mut Interpreter) -> RuntimeResult<()> {
+        interpreter.push_new_env();
+        for stmt in &self.stmts {
+            if let Err(e) = stmt.execute(interpreter) {
+                interpreter.pop_env();
+                return Err(e);
+            }
+        }
+        interpreter.pop_env();
+        Ok(())
     }
 }
 
@@ -232,7 +247,7 @@ pub struct Environment {
 }
 
 pub struct EnvInner {
-    enclosing: Option<Environment>,
+    pub enclosing: Option<Environment>,
     map: HashMap<String, Value>,
 }
 
@@ -249,6 +264,14 @@ impl std::default::Default for Environment {
     fn default() -> Self {
         Environment {
             inner: Rc::new(RefCell::new(EnvInner::default())),
+        }
+    }
+}
+
+impl std::clone::Clone for Environment {
+    fn clone(&self) -> Self {
+        Environment {
+            inner: self.inner.clone()
         }
     }
 }
@@ -312,6 +335,10 @@ impl Environment {
         }
     }
 
+    pub fn enclosing_env(&self) -> Option<Environment> {
+        self.inner.borrow().enclosing.clone()
+    }
+
     pub fn with_enclosing(enclosing: Environment) -> Environment {
         Environment {
             inner: Rc::new(RefCell::new(EnvInner::with_enclosing(enclosing))),
@@ -343,6 +370,17 @@ impl Interpreter {
     pub fn new() -> Self {
         Interpreter {
             env: Environment::default(),
+        }
+    }
+
+    pub fn push_new_env(&mut self) {
+        let env = Environment::with_enclosing(self.env.clone());
+        self.env = env;
+    }
+
+    pub fn pop_env(&mut self) {
+        if let Some(prev) = self.env.enclosing_env() {
+            self.env = prev;
         }
     }
 

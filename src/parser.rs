@@ -390,12 +390,23 @@ impl<'a> Parser<'a> {
         }
     }
 
+    fn while_stmt(&mut self) -> ParseResult<Stmt> {
+        self.consume_or_err(&TokenKind::LEFT_PAREN)?;
+        let cond = self.expression()?;
+        self.consume_or_err(&TokenKind::RIGHT_PAREN)?;
+        let body = self.statement()?;
+        Ok(Stmt::new_while(cond, body))
+    }
+
     fn statement(&mut self) -> ParseResult<Stmt> {
         if self.advance_if_eq(&TokenKind::PRINT).is_some() {
             return self.print_stmt();
         }
         if self.advance_if_eq(&TokenKind::IF).is_some() {
             return self.if_statement();
+        }
+        if self.advance_if_eq(&TokenKind::WHILE).is_some() {
+            return self.while_stmt();
         }
         if self.advance_if_eq(&TokenKind::LEFT_BRACE).is_some() {
             return self.block_stmt();

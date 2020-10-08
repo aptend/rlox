@@ -7,6 +7,7 @@ pub enum Stmt {
     Var(VariableStmt),
     Block(BlockStmt),
     If(IfStmt),
+    While(WhileStmt),
 }
 
 impl std::default::Default for Stmt {
@@ -38,6 +39,13 @@ impl Stmt {
             no_token: no_taken.map(|s| Box::new(s)),
         })
     }
+
+    pub fn new_while(cond: Expr, body: Stmt) -> Stmt {
+        Stmt::While(WhileStmt {
+            cond,
+            body: Box::new(body),
+        })
+    }
 }
 
 pub struct VariableStmt {
@@ -53,4 +61,9 @@ pub struct IfStmt {
     pub cond: Expr,
     pub taken: Box<Stmt>,
     pub no_token: Option<Box<Stmt>>,
+}
+
+pub struct WhileStmt {
+    pub cond: Expr,
+    pub body: Box<Stmt>,
 }

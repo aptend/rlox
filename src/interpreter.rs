@@ -242,6 +242,7 @@ impl Execute for Stmt {
             }
             Stmt::Block(b) => b.execute(interpreter),
             Stmt::If(i) => i.execute(interpreter),
+            Stmt::While(w) => w.execute(interpreter),
         }
     }
 }
@@ -269,6 +270,15 @@ impl Execute for IfStmt {
         } else {
             Ok(())
         }
+    }
+}
+
+impl Execute for WhileStmt {
+    fn execute(&self, interpreter: &mut Interpreter) -> RuntimeResult<()> {
+        while self.cond.interpret(interpreter)?.is_truthy() {
+            self.body.execute(interpreter)?;
+        }
+        Ok(())
     }
 }
 

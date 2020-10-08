@@ -316,7 +316,7 @@ impl<'a> Parser<'a> {
         }
         Ok(left)
     }
-    
+
     fn assignment(&mut self) -> ParseResult<Expr> {
         // parse left-value, it is also an expression, like x.y = 42
         // we check if it is valid later
@@ -398,6 +398,50 @@ impl<'a> Parser<'a> {
         Ok(Stmt::new_while(cond, body))
     }
 
+    fn for_stmt(&mut self) -> ParseResult<Stmt> {
+        self.consume_or_err(&TokenKind::LEFT_PAREN)?;
+
+        let initial = if self.advance_if_eq(&TokenKind::SEMICOLON).is_some() {
+            None
+        } else if self.advance_if_eq(&TokenKind::VAR).is_some() {
+            Some(self.var_decl_stmt()?)
+        } else {
+            Some(self.expression_stmt()?)
+        };
+
+        let condition = if self.advance_if_eq(&TokenKind::SEMICOLON).is_some() {
+            Expr::new_bool_literal(true)
+        } else {
+            let cond = self.expression()?;
+            self.consume_or_err(&TokenKind::SEMICOLON)?;
+            cond
+        };
+
+        let increment = if self.advance_if_eq(&TokenKind::RIGHT_PAREN).is_some()
+        {
+            None
+        } else {
+            let inc = self.expression()?;
+            self.consume_or_err(&TokenKind::RIGHT_PAREN)?;
+            Some(inc)
+        };
+
+        let mut body = self.statement()?;
+
+        // assemble body and increment
+        if let Some(inc_expr) = increment {
+            body = Stmt::new_block(vec![body, Stmt::new_expr(inc_expr)]);
+        }
+
+        body = Stmt::new_while(condition, body);
+
+        if let Some(init) = initial {
+            body = Stmt::new_block(vec![init, body]);
+        }
+
+        Ok(body)
+    }
+
     fn statement(&mut self) -> ParseResult<Stmt> {
         if self.advance_if_eq(&TokenKind::PRINT).is_some() {
             return self.print_stmt();
@@ -407,6 +451,9 @@ impl<'a> Parser<'a> {
         }
         if self.advance_if_eq(&TokenKind::WHILE).is_some() {
             return self.while_stmt();
+        }
+        if self.advance_if_eq(&TokenKind::FOR).is_some() {
+            return self.for_stmt();
         }
         if self.advance_if_eq(&TokenKind::LEFT_BRACE).is_some() {
             return self.block_stmt();

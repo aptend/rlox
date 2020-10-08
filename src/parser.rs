@@ -299,10 +299,28 @@ impl<'a> Parser<'a> {
         Ok(left)
     }
 
+    fn and_expr(&mut self) -> ParseResult<Expr> {
+        let mut left = self.equality()?;
+        while let Some(op) = self.advance_if_eq(&TokenKind::AND) {
+            let right = self.comparison()?;
+            left = Expr::new_logical(op, left, right);
+        }
+        Ok(left)
+    }
+
+    fn or_expr(&mut self) -> ParseResult<Expr> {
+        let mut left = self.and_expr()?;
+        while let Some(op) = self.advance_if_eq(&TokenKind::OR) {
+            let right = self.comparison()?;
+            left = Expr::new_logical(op, left, right);
+        }
+        Ok(left)
+    }
+    
     fn assignment(&mut self) -> ParseResult<Expr> {
         // parse left-value, it is also an expression, like x.y = 42
         // we check if it is valid later
-        let l_value = self.equality()?;
+        let l_value = self.or_expr()?;
         if let Some(equal_tk) = self.advance_if_eq(&TokenKind::EQUAL) {
             if let Expr::Variable(v) = l_value {
                 // it is a valid assignment, so we continue to

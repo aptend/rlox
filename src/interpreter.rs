@@ -95,6 +95,7 @@ impl Interpret for Expr {
             Expr::Grouping(g) => g.interpret(interpreter),
             Expr::Variable(v) => v.interpret(interpreter),
             Expr::Assign(a) => a.interpret(interpreter),
+            Expr::Logical(l) => l.interpret(interpreter),
         }
     }
 }
@@ -189,6 +190,32 @@ impl Interpret for BinaryExpr {
             _ => Err(RuntimeError::BinaryMismatchedType(Box::new(
                 self.op.clone(),
             ))),
+        }
+    }
+}
+
+impl Interpret for LogicalExpr {
+    fn interpret(&self, interpreter: &mut Interpreter) -> RuntimeResult<Value> {
+        match &self.op.kind {
+            TokenKind::OR => {
+                if self.left.interpret(interpreter)?.is_truthy() {
+                    Ok(Value::Boolean(true))
+                } else {
+                    Ok(Value::Boolean(
+                        self.right.interpret(interpreter)?.is_truthy(),
+                    ))
+                }
+            }
+            TokenKind::AND => {
+                if !self.left.interpret(interpreter)?.is_truthy() {
+                    Ok(Value::Boolean(false))
+                } else {
+                    Ok(Value::Boolean(
+                        self.right.interpret(interpreter)?.is_truthy(),
+                    ))
+                }
+            }
+            _ => unreachable!(),
         }
     }
 }

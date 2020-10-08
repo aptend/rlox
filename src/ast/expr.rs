@@ -2,6 +2,7 @@ use crate::scanner::Token;
 pub enum Expr {
     Unary(UnaryExpr),
     Binary(BinaryExpr),
+    Logical(LogicalExpr),
     Grouping(Grouping),
     Literal(Literal),
     Variable(VariableExpr),
@@ -23,6 +24,14 @@ impl Expr {
 
     pub fn new_binary(op: Token, left: Expr, right: Expr) -> Expr {
         Expr::Binary(BinaryExpr {
+            left: Box::new(left),
+            op,
+            right: Box::new(right),
+        })
+    }
+
+    pub fn new_logical(op: Token, left: Expr, right: Expr) -> Expr {
+        Expr::Logical(LogicalExpr {
             left: Box::new(left),
             op,
             right: Box::new(right),
@@ -66,6 +75,12 @@ pub struct UnaryExpr {
 }
 
 pub struct BinaryExpr {
+    pub left: Box<Expr>,
+    pub op: Token,
+    pub right: Box<Expr>,
+}
+
+pub struct LogicalExpr {
     pub left: Box<Expr>,
     pub op: Token,
     pub right: Box<Expr>,

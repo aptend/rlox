@@ -26,7 +26,19 @@ impl AstPrint for Expr {
             Expr::Grouping(v) => v.print_ast(),
             Expr::Variable(v) => v.print_ast(),
             Expr::Assign(v) => v.print_ast(),
+            Expr::Logical(v) => v.print_ast(),
         }
+    }
+}
+
+impl AstPrint for LogicalExpr {
+    fn print_ast(&self) -> String {
+        format!(
+            "({:?} {} {})",
+            self.op,
+            self.left.print_ast(),
+            self.right.print_ast()
+        )
     }
 }
 

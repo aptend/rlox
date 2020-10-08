@@ -1,9 +1,14 @@
 use crate::ast::*;
 use crate::scanner::{Token, TokenKind};
 
+use std::cell::RefCell;
 use std::collections::HashMap;
 use std::fmt;
+use std::rc::Rc;
 
+
+// it is lame to copy Value in every calculation step during treewalk
+// use rc to rescure? but, whatever for now
 #[derive(Clone, Debug, PartialEq)]
 pub enum Value {
     Nil,
@@ -38,6 +43,10 @@ impl fmt::Display for Value {
     }
 }
 
+// ------------------------------------------------------------------------
+// ------- RuntimeError ---------------------------------------------------
+// ------------------------------------------------------------------------
+
 type BoxToken = Box<Token>;
 type RuntimeResult<T> = Result<T, RuntimeError>;
 
@@ -70,6 +79,10 @@ impl fmt::Display for RuntimeError {
     }
 }
 
+// ------------------------------------------------------------------------
+// ----- Trait Interpret for expr -----------------------------------------
+// ------------------------------------------------------------------------
+
 trait Interpret {
     fn interpret(&self, interpreter: &mut Interpreter) -> RuntimeResult<Value>;
 }
@@ -90,26 +103,14 @@ impl Interpret for Expr {
 impl Interpret for AssignExpr {
     fn interpret(&self, interpreter: &mut Interpreter) -> RuntimeResult<Value> {
         let val = self.value.interpret(interpreter)?;
-        match interpreter.env.get_mut(self.name.string_ref().unwrap()) {
-            Some(v) => {
-                *v = val.clone();
-                Ok(val)
-            }
-            None => Err(RuntimeError::UndefinedIdentifier(Box::new(
-                self.name.clone(),
-            ))),
-        }
+        interpreter.env.assign(&self.name, val.clone())?;
+        Ok(val)
     }
 }
 
 impl Interpret for VariableExpr {
     fn interpret(&self, interpreter: &mut Interpreter) -> RuntimeResult<Value> {
-        match interpreter.env.get(self.name.string_ref().unwrap()) {
-            Some(v) => Ok(v.clone()),
-            None => Err(RuntimeError::UndefinedIdentifier(Box::new(
-                self.name.clone(),
-            ))),
-        }
+        interpreter.env.get(&self.name)
     }
 }
 
@@ -193,6 +194,10 @@ impl Interpret for BinaryExpr {
     }
 }
 
+// ---------------------------------------------------------------------------
+// ---- Trait Execute for Stmt -----------------------------------------------
+// ---------------------------------------------------------------------------
+
 trait Execute {
     fn execute(&self, interpreter: &mut Interpreter) -> RuntimeResult<()>;
 }
@@ -210,23 +215,134 @@ impl Execute for Stmt {
             }
             Stmt::Var(v) => {
                 let init_val = v.init.interpret(interpreter)?;
-                interpreter
-                    .env
-                    .insert(v.name.string_ref().unwrap().clone(), init_val);
-                Ok(())
+                interpreter.env.define(&v.name, init_val)
             }
         }
     }
 }
 
+// ---------------------------------------------------------------------------
+// ---- Environment ----------------------------------------------------------
+// ---------------------------------------------------------------------------
+
+pub struct Environment {
+    // multiple nest scopes could refer to the same top level scope
+    // they have to hold shared muttablity (in single thread)
+    inner: Rc<RefCell<EnvInner>>,
+}
+
+pub struct EnvInner {
+    enclosing: Option<Environment>,
+    map: HashMap<String, Value>,
+}
+
+impl std::default::Default for EnvInner {
+    fn default() -> Self {
+        EnvInner {
+            enclosing: None,
+            map: HashMap::new(),
+        }
+    }
+}
+
+impl std::default::Default for Environment {
+    fn default() -> Self {
+        Environment {
+            inner: Rc::new(RefCell::new(EnvInner::default())),
+        }
+    }
+}
+
+impl EnvInner {
+    pub fn new(enclosing: Environment, map: HashMap<String, Value>) -> Self {
+        EnvInner {
+            enclosing: Some(enclosing),
+            map,
+        }
+    }
+
+    pub fn with_enclosing(enclosing: Environment) -> Self {
+        EnvInner {
+            enclosing: Some(enclosing),
+            map: HashMap::new(),
+        }
+    }
+
+    pub fn define(&mut self, token: &Token, val: Value) -> RuntimeResult<()> {
+        self.map.insert(token.string_ref().unwrap().clone(), val);
+        Ok(())
+    }
+
+    pub fn assign(&mut self, token: &Token, val: Value) -> RuntimeResult<()> {
+        match self.map.get_mut(token.string_ref().unwrap()) {
+            Some(v) => {
+                *v = val;
+                Ok(())
+            }
+            None => match self.enclosing {
+                Some(ref env) => env.assign(token, val),
+                None => Err(RuntimeError::UndefinedIdentifier(Box::new(
+                    token.clone(),
+                ))),
+            },
+        }
+    }
+
+    pub fn get(&self, token: &Token) -> RuntimeResult<Value> {
+        // only variable expr will call get, it is safe to unwrap
+        match self.map.get(token.string_ref().unwrap()) {
+            Some(v) => Ok(v.clone()),
+            None => match self.enclosing {
+                Some(ref env) => env.get(token),
+                None => Err(RuntimeError::UndefinedIdentifier(Box::new(
+                    token.clone(),
+                ))),
+            },
+        }
+    }
+}
+
+impl Environment {
+    pub fn new(
+        enclosing: Environment,
+        map: HashMap<String, Value>,
+    ) -> Environment {
+        Environment {
+            inner: Rc::new(RefCell::new(EnvInner::new(enclosing, map))),
+        }
+    }
+
+    pub fn with_enclosing(enclosing: Environment) -> Environment {
+        Environment {
+            inner: Rc::new(RefCell::new(EnvInner::with_enclosing(enclosing))),
+        }
+    }
+
+    pub fn define(&self, token: &Token, val: Value) -> RuntimeResult<()> {
+        self.inner.borrow_mut().define(token, val)
+    }
+
+    pub fn assign(&self, token: &Token, val: Value) -> RuntimeResult<()> {
+        self.inner.borrow_mut().assign(token, val)
+    }
+
+    pub fn get(&self, token: &Token) -> RuntimeResult<Value> {
+        self.inner.borrow().get(token)
+    }
+}
+
+// ---------------------------------------------------------------------------
+// ---- Interpreter ----------------------------------------------------------
+// ---------------------------------------------------------------------------
+
 pub struct Interpreter {
-    env: HashMap<String, Value>,
+    env: Environment,
 }
 
 impl Interpreter {
     pub fn new() -> Self {
         Interpreter {
-            env: HashMap::new(),
+            env: Environment::default(),
         }
     }
 

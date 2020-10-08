@@ -1,5 +1,4 @@
 var question = "what is the answer?";
-
 var answer = 42;
 
 print question;

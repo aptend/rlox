@@ -107,7 +107,16 @@ impl Interpret for Expr {
             Expr::Variable(v) => v.interpret(interpreter),
             Expr::Assign(a) => a.interpret(interpreter),
             Expr::Logical(l) => l.interpret(interpreter),
+            Expr::Call(c) => c.interpret(interpreter),
         }
+    }
+}
+
+impl Interpret for CallExpr {
+    fn interpret(&self, interpreter: &mut Interpreter) -> RuntimeResult<Value> {
+        use super::ast::ast_printer::AstPrint;
+        println!("{}", self.print_ast());
+        Ok(Value::default())
     }
 }
 

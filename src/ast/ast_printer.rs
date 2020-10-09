@@ -27,7 +27,23 @@ impl AstPrint for Expr {
             Expr::Variable(v) => v.print_ast(),
             Expr::Assign(v) => v.print_ast(),
             Expr::Logical(v) => v.print_ast(),
+            Expr::Call(v) => v.print_ast(),
         }
+    }
+}
+
+impl AstPrint for CallExpr {
+    fn print_ast(&self) -> String {
+        let mut s = format!("({}", self.callee.print_ast());
+        if self.arguments.is_empty() {
+            s.push_str(" nil");
+        }
+        for expr in &self.arguments {
+            s.push(' ');
+            s.push_str(expr.print_ast().as_str());
+        }
+        s.push(')');
+        s
     }
 }
 

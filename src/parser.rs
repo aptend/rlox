@@ -25,6 +25,7 @@ pub enum SyntaxError {
     ExpectIdentifier(BoxToken),
     InvalidAssignTarget(BoxToken),
     BreakOutside(BoxToken),
+    TooManyArguments(BoxToken),
     LexError(ScanError),
 }
 
@@ -83,6 +84,10 @@ impl fmt::Display for SyntaxError {
                 write_position(f, t)?;
                 write!(f, "'break' can be used in a loop scope only")
             }
+            SyntaxError::TooManyArguments(t) => {
+                write_position(f, t)?;
+                write!(f, "Can't have more than 255 arguments")
+            }
         }
     }
 }
@@ -131,6 +136,15 @@ impl<'a> Parser<'a> {
         self.peeked.as_ref()
     }
 
+    fn peek_check<F: FnOnce(&TokenKind)->bool>(&mut self, f:F) -> bool {
+        if let Some(tk) = self.peek() {
+            if f(&tk.kind) {
+                return true;
+            }
+        }
+        false
+    }
+
     fn box_current_token(&mut self) -> BoxToken {
         if self.peek().is_some() {
             Box::new(self.peeked.take().unwrap())
@@ -140,28 +154,22 @@ impl<'a> Parser<'a> {
     }
 
     fn advance_if_eq(&mut self, kind: &TokenKind) -> Option<Token> {
-        if let Some(token) = self.peek() {
-            if &token.kind == kind {
-                return self.advance();
-            }
+        if self.peek_check(|k| k == kind) {
+            return self.advance();
         }
         None
     }
 
     fn advance_if_contains(&mut self, kinds: &[TokenKind]) -> Option<Token> {
-        if let Some(t) = self.peek() {
-            for kind in kinds {
-                if &t.kind == kind {
-                    return self.advance();
-                }
-            }
+        if self.peek_check(|k| kinds.contains(k)) {
+            return self.advance();
         }
         None
     }
 
-    fn consume_or_err(&mut self, kind: &TokenKind) -> ParseResult<()> {
-        if self.advance_if_eq(kind).is_some() {
-            Ok(())
+    fn consume_or_err(&mut self, kind: &TokenKind) -> ParseResult<Token> {
+        if let Some(tk) = self.advance_if_eq(kind) {
+            Ok(tk)
         } else {
             let tk = self.box_current_token();
             match kind {
@@ -249,6 +257,43 @@ impl<'a> Parser<'a> {
         Err(SyntaxError::ExpectExpression(self.box_current_token()))
     }
 
+    fn call(&mut self) -> ParseResult<Expr> {
+        let mut callee = self.primary()?;
+
+        loop {
+            if self.advance_if_eq(&TokenKind::LEFT_PAREN).is_some() {
+                callee = self.finish_call(callee)?;
+            } else {
+                break;
+            }
+        }
+
+        Ok(callee)
+    }
+
+    fn finish_call(&mut self, mut callee: Expr) -> ParseResult<Expr> {
+        let mut arguments = vec![];
+        if self.peek_check(|k| k != &TokenKind::RIGHT_PAREN) {
+            // collect all arguments
+            loop {
+                if arguments.len() >= 255 {
+                    // don't bail out here,
+                    // just record SyntaxError and move on
+                    let tk = self.box_current_token();
+                    self.errors.push(SyntaxError::TooManyArguments(tk));
+                }
+                arguments.push(self.expression()?);
+                if self.advance_if_eq(&TokenKind::COMMA).is_none() {
+                    break;
+                }
+            }
+        }
+        let paren = self.consume_or_err(&TokenKind::RIGHT_PAREN)?;
+
+        callee = Expr::new_call(callee, paren, arguments);
+        Ok(callee)
+    }
+
     fn unary(&mut self) -> ParseResult<Expr> {
         if let Some(op) =
             self.advance_if_contains(&[TokenKind::MINUS, TokenKind::BANG])
@@ -256,7 +301,7 @@ impl<'a> Parser<'a> {
             let right = self.unary()?;
             Ok(Expr::new_unary(op, right))
         } else {
-            self.primary()
+            self.call()
         }
     }
 
@@ -368,12 +413,9 @@ impl<'a> Parser<'a> {
     fn block_stmt(&mut self) -> ParseResult<Stmt> {
         let mut stmts = Vec::new();
 
-        while let Some(tk) = self.peek() {
-            // if there is a missing right brace,
-            // the SyntaxError will be reported at EOF, akward.
-            if TokenKind::RIGHT_BRACE == tk.kind {
-                break;
-            }
+        // if there is a missing right brace,
+        // the SyntaxError will be reported at EOF, akward.
+        while self.peek_check(|k| k != &TokenKind::RIGHT_BRACE) {
             match self.declaration() {
                 Ok(stmt) => stmts.push(stmt),
                 Err(err) => {

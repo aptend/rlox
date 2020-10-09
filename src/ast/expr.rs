@@ -7,6 +7,7 @@ pub enum Expr {
     Literal(Literal),
     Variable(VariableExpr),
     Assign(AssignExpr),
+    Call(CallExpr),
 }
 
 impl Expr {
@@ -61,6 +62,14 @@ impl Expr {
             value: Box::new(value),
         })
     }
+
+    pub fn new_call(callee: Expr, paren: Token, arguments: Vec<Expr>) -> Expr {
+        Expr::Call(CallExpr {
+            callee: Box::new(callee),
+            pos_tk: paren,
+            arguments
+        })
+    }
 }
 
 impl std::default::Default for Expr {
@@ -104,4 +113,10 @@ pub struct VariableExpr {
 pub struct AssignExpr {
     pub name: Token,
     pub value: Box<Expr>,
+}
+
+pub struct CallExpr {
+    pub callee: Box<Expr>,
+    pub pos_tk: Token,
+    pub arguments: Vec<Expr>,
 }

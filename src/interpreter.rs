@@ -6,14 +6,72 @@ use std::collections::HashMap;
 use std::fmt;
 use std::rc::Rc;
 
-// it is lame to copy Value in every calculation step during treewalk
-// use rc to rescure? but, whatever for now
+use std::ops::Deref;
+// Clonable trait object
+#[derive(Debug, Clone)]
+pub struct Callable {
+    inner: Rc<RefCell<dyn LoxCallable>>,
+}
+
+impl LoxCallable for Callable {
+    fn arity(&self) -> u8 {
+        self.inner.borrow().arity()
+    }
+
+    fn call(
+        &mut self,
+        interpreter: &mut Interpreter,
+        args: Vec<Value>,
+    ) -> RuntimeResult<Value> {
+        self.inner.borrow_mut().call(interpreter, args)
+    }
+}
+
+impl PartialEq for Callable {
+    fn eq(&self, _: &Self) -> bool {
+        // make compiler happy, we don't need this actually.
+        unimplemented!()
+    }
+}
+
+pub trait LoxCallable: fmt::Debug {
+    fn arity(&self) -> u8;
+
+    fn call(
+        &mut self,
+        interpreter: &mut Interpreter,
+        args: Vec<Value>,
+    ) -> RuntimeResult<Value>;
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct RcString {
+    inner: Rc<String>,
+}
+
+// make Value::String cloning cheap
+impl RcString {
+    fn new(s: &str) -> RcString {
+        RcString {
+            inner: Rc::new(s.to_owned()),
+        }
+    }
+}
+
+impl Deref for RcString {
+    type Target = str;
+    fn deref(&self) -> &Self::Target {
+        &*self.inner
+    }
+}
+
 #[derive(Clone, Debug, PartialEq)]
 pub enum Value {
     Nil,
-    String(String),
+    String(RcString),
     Number(f64),
     Boolean(bool),
+    Callable(Callable),
 }
 
 impl Value {
@@ -35,9 +93,10 @@ impl fmt::Display for Value {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Value::Nil => write!(f, "nil"),
-            Value::String(s) => write!(f, "{}", s),
+            Value::String(s) => write!(f, "{}", s.deref()),
             Value::Number(n) => write!(f, "{}", n),
             Value::Boolean(b) => write!(f, "{}", b),
+            Value::Callable(_) => write!(f, "'callee'"),
         }
     }
 }
@@ -53,6 +112,11 @@ pub enum RuntimeError {
     UnaryMismatchedType(BoxToken),
     BinaryMismatchedType(BoxToken),
     UndefinedIdentifier(BoxToken),
+    NonCallable(BoxToken),
+    // maxium argmument counts is 255, u8 is enough.
+    ArityMismatch(BoxToken, u8, u8),
+
+    // Not visible for user, interpreter use it to break loop
     BreakControl,
 }
 
@@ -83,6 +147,14 @@ impl fmt::Display for RuntimeError {
                     "Undefined identifier: {}",
                     token.string_ref().unwrap()
                 )
+            }
+            RuntimeError::NonCallable(token) => {
+                write_position(f, token)?;
+                write!(f, "Can only call functions and classes")
+            }
+            RuntimeError::ArityMismatch(token, expect, got) => {
+                write_position(f, token)?;
+                write!(f, "Expected {} arguments but got {}", expect, got)
             }
             RuntimeError::BreakControl => write!(f, "break control signal"),
         }
@@ -116,7 +188,29 @@ impl Interpret for CallExpr {
     fn interpret(&self, interpreter: &mut Interpreter) -> RuntimeResult<Value> {
         use super::ast::ast_printer::AstPrint;
         println!("{}", self.print_ast());
-        Ok(Value::default())
+
+        // check type
+        if let Value::Callable(mut callee) =
+            self.callee.interpret(interpreter)?
+        {
+            // check arity
+            let (expect, got) = (callee.arity(), self.arguments.len() as u8);
+            if expect != got {
+                return Err(RuntimeError::ArityMismatch(
+                    Box::new(self.pos_tk.clone()),
+                    expect,
+                    got,
+                ));
+            }
+            // eval args and call
+            let mut args = Vec::new();
+            for arg in &self.arguments {
+                args.push(arg.interpret(interpreter)?);
+            }
+            callee.call(interpreter, args)
+        } else {
+            Err(RuntimeError::NonCallable(Box::new(self.pos_tk.clone())))
+        }
     }
 }
 
@@ -139,7 +233,7 @@ impl Interpret for Literal {
         match self {
             Literal::Nil => Ok(Value::Nil),
             Literal::Boolean(b) => Ok(Value::Boolean(*b)),
-            Literal::String(s) => Ok(Value::String(s.clone())),
+            Literal::String(s) => Ok(Value::String(RcString::new(s))),
             Literal::Number(n) => Ok(Value::Number(*n)),
         }
     }
@@ -175,9 +269,10 @@ impl Interpret for BinaryExpr {
         let left_val = self.left.interpret(interpreter)?;
         let right_val = self.right.interpret(interpreter)?;
         match (&self.op.kind, left_val, right_val) {
-            (TokenKind::PLUS, Value::String(mut s1), Value::String(s2)) => {
-                s1 += &s2;
-                Ok(Value::String(s1))
+            (TokenKind::PLUS, Value::String(s1), Value::String(s2)) => {
+                let mut s = s1.to_string();
+                s += &s2;
+                Ok(Value::String(RcString::new(&s)))
             }
             (TokenKind::PLUS, Value::Number(n1), Value::Number(n2)) => {
                 Ok(Value::Number(n1 + n2))

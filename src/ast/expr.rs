@@ -67,7 +67,7 @@ impl Expr {
         Expr::Call(CallExpr {
             callee: Box::new(callee),
             pos_tk: paren,
-            arguments
+            arguments,
         })
     }
 }

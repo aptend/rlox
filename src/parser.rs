@@ -136,7 +136,7 @@ impl<'a> Parser<'a> {
         self.peeked.as_ref()
     }
 
-    fn peek_check<F: FnOnce(&TokenKind)->bool>(&mut self, f:F) -> bool {
+    fn peek_check<F: FnOnce(&TokenKind) -> bool>(&mut self, f: F) -> bool {
         if let Some(tk) = self.peek() {
             if f(&tk.kind) {
                 return true;

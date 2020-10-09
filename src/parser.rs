@@ -16,13 +16,30 @@ type BoxToken = Box<Token>;
 type ParseResult<T> = Result<T, SyntaxError>;
 
 #[derive(Debug)]
+pub enum SynCxt {
+    VarDecl,
+    FunDecl,
+    MethodDecl,
+}
+
+impl fmt::Display for SynCxt {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            SynCxt::VarDecl => write!(f, "variable declaration"),
+            SynCxt::FunDecl => write!(f, "function declaration"),
+            SynCxt::MethodDecl => write!(f, "method declaration"),
+        }
+    }
+}
+
+#[derive(Debug)]
 pub enum SyntaxError {
     ExpectExpression(BoxToken),
     ExpectLeftParen(BoxToken),
     ExpectRightParen(BoxToken),
     ExpectRightBrace(BoxToken),
     ExpectSemicolon(BoxToken),
-    ExpectIdentifier(BoxToken),
+    ExpectIdentifier(BoxToken, SynCxt),
     InvalidAssignTarget(BoxToken),
     BreakOutside(BoxToken),
     TooManyArguments(BoxToken),
@@ -72,9 +89,9 @@ impl fmt::Display for SyntaxError {
                 write_position(f, t)?;
                 write!(f, "expect a ';' after statement, but '{:?}' found", t)
             }
-            SyntaxError::ExpectIdentifier(t) => {
+            SyntaxError::ExpectIdentifier(t, cxt) => {
                 write_position(f, t)?;
-                write!(f, "expect an identifier, but '{:?}' found", t)
+                write!(f, "expect an identifier, required by {}, but '{:?}' found",cxt, t)
             }
             SyntaxError::InvalidAssignTarget(t) => {
                 write_position(f, t)?;
@@ -539,7 +556,7 @@ impl<'a> Parser<'a> {
             self.consume_or_err(&TokenKind::SEMICOLON)?;
             Ok(Stmt::new_variable(token, init))
         } else {
-            Err(SyntaxError::ExpectIdentifier(self.box_current_token()))
+            Err(SyntaxError::ExpectIdentifier(self.box_current_token(), SynCxt::VarDecl))
         }
     }
 

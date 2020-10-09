@@ -24,6 +24,7 @@ pub enum SyntaxError {
     ExpectSemicolon(BoxToken),
     ExpectIdentifier(BoxToken),
     InvalidAssignTarget(BoxToken),
+    BreakOutside(BoxToken),
     LexError(ScanError),
 }
 
@@ -78,6 +79,10 @@ impl fmt::Display for SyntaxError {
                 write_position(f, t)?;
                 write!(f, "invalid assignment target")
             }
+            SyntaxError::BreakOutside(t) => {
+                write_position(f, t)?;
+                write!(f, "'break' can be used in a loop scope only")
+            }
         }
     }
 }
@@ -86,6 +91,9 @@ pub struct Parser<'a> {
     errors: Vec<SyntaxError>,
     peeked: Option<Token>,
     tokens: Scanner<'a>,
+    // count nest loop,
+    // break; statement is allowed in loop scope
+    n_loop: usize,
 }
 
 impl<'a> Parser<'a> {
@@ -94,6 +102,7 @@ impl<'a> Parser<'a> {
             errors: Vec::new(),
             peeked: None,
             tokens: scanner,
+            n_loop: 0,
         }
     }
 
@@ -382,9 +391,9 @@ impl<'a> Parser<'a> {
         self.consume_or_err(&TokenKind::LEFT_PAREN)?;
         let cond = self.expression()?;
         self.consume_or_err(&TokenKind::RIGHT_PAREN)?;
-        let taken = self.statement()?;
+        let taken = self.breakable_stmt()?;
         if self.advance_if_eq(&TokenKind::ELSE).is_some() {
-            Ok(Stmt::new_if(cond, taken, Some(self.statement()?)))
+            Ok(Stmt::new_if(cond, taken, Some(self.breakable_stmt()?)))
         } else {
             Ok(Stmt::new_if(cond, taken, None))
         }
@@ -394,7 +403,9 @@ impl<'a> Parser<'a> {
         self.consume_or_err(&TokenKind::LEFT_PAREN)?;
         let cond = self.expression()?;
         self.consume_or_err(&TokenKind::RIGHT_PAREN)?;
-        let body = self.statement()?;
+        self.n_loop += 1;
+        let body = self.breakable_stmt()?;
+        self.n_loop -= 1;
         Ok(Stmt::new_while(cond, body))
     }
 
@@ -426,7 +437,9 @@ impl<'a> Parser<'a> {
             Some(inc)
         };
 
-        let mut body = self.statement()?;
+        self.n_loop += 1;
+        let mut body = self.breakable_stmt()?;
+        self.n_loop -= 1;
 
         // assemble body and increment
         if let Some(inc_expr) = increment {
@@ -440,6 +453,18 @@ impl<'a> Parser<'a> {
         }
 
         Ok(body)
+    }
+
+    fn breakable_stmt(&mut self) -> ParseResult<Stmt> {
+        if let Some(brk_tk) = self.advance_if_eq(&TokenKind::BREAK) {
+            if self.n_loop > 0 {
+                self.consume_or_err(&TokenKind::SEMICOLON)?;
+                return Ok(Stmt::new_break());
+            } else {
+                return Err(SyntaxError::BreakOutside(Box::new(brk_tk)));
+            }
+        }
+        self.statement()
     }
 
     fn statement(&mut self) -> ParseResult<Stmt> {
@@ -480,7 +505,7 @@ impl<'a> Parser<'a> {
         if self.advance_if_eq(&TokenKind::VAR).is_some() {
             return self.var_decl_stmt();
         }
-        self.statement()
+        self.breakable_stmt()
     }
 
     pub fn parse(&mut self) -> Result<Vec<Stmt>, Vec<SyntaxError>> {

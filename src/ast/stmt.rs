@@ -8,6 +8,7 @@ pub enum Stmt {
     Block(BlockStmt),
     If(IfStmt),
     While(WhileStmt),
+    Break,
 }
 
 impl std::default::Default for Stmt {
@@ -45,6 +46,10 @@ impl Stmt {
             cond,
             body: Box::new(body),
         })
+    }
+
+    pub fn new_break() -> Stmt {
+        Stmt::Break
     }
 }
 

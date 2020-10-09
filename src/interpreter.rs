@@ -53,28 +53,39 @@ pub enum RuntimeError {
     UnaryMismatchedType(BoxToken),
     BinaryMismatchedType(BoxToken),
     UndefinedIdentifier(BoxToken),
+    BreakControl,
+}
+
+fn write_position(f: &mut fmt::Formatter<'_>, token: &Token) -> fmt::Result {
+    if token.kind == TokenKind::EOF {
+        write!(f, "[the last line] RuntimeError: ")
+    } else {
+        let (line, col) = (token.position.line, token.position.column);
+        write!(f, "[line {}, column {}] RuntimeError: ", line, col)
+    }
 }
 
 impl fmt::Display for RuntimeError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let mut msg = String::new();
-        let token = match self {
+        match self {
             RuntimeError::UnaryMismatchedType(token) => {
-                msg.push_str("Operand of unary op '-' must be a number.");
-                token
+                write_position(f, token)?;
+                write!(f, "Operand of unary op '-' must be a number.")
             }
             RuntimeError::BinaryMismatchedType(token) => {
-                msg.push_str("Operands must be numbers");
-                token
+                write_position(f, token)?;
+                write!(f, "Operands must be numbers")
             }
             RuntimeError::UndefinedIdentifier(token) => {
-                msg.push_str("Undefined identifier: ");
-                msg.push_str(token.string_ref().unwrap());
-                token
+                write_position(f, token)?;
+                write!(
+                    f,
+                    "Undefined identifier: {}",
+                    token.string_ref().unwrap()
+                )
             }
-        };
-        let (line, col) = (token.position.line, token.position.column);
-        write!(f, "[line {}, column {}] RuntimeError: {}", line, col, msg)
+            RuntimeError::BreakControl => write!(f, "break control signal"),
+        }
     }
 }
 
@@ -243,6 +254,7 @@ impl Execute for Stmt {
             Stmt::Block(b) => b.execute(interpreter),
             Stmt::If(i) => i.execute(interpreter),
             Stmt::While(w) => w.execute(interpreter),
+            Stmt::Break => Err(RuntimeError::BreakControl),
         }
     }
 }
@@ -276,7 +288,11 @@ impl Execute for IfStmt {
 impl Execute for WhileStmt {
     fn execute(&self, interpreter: &mut Interpreter) -> RuntimeResult<()> {
         while self.cond.interpret(interpreter)?.is_truthy() {
-            self.body.execute(interpreter)?;
+            match self.body.execute(interpreter) {
+                Err(RuntimeError::BreakControl) => break,
+                Err(e) => return Err(e),
+                Ok(_) => (), // nothing to do, loop next
+            };
         }
         Ok(())
     }

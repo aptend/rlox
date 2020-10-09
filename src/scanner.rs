@@ -51,6 +51,7 @@ pub enum TokenKind {
     TRUE,
     VAR,
     WHILE,
+    BREAK,
 
     EOF,
 }
@@ -305,6 +306,7 @@ impl<'a> Scanner<'a> {
             "true" => Ok(TokenKind::TRUE),
             "var" => Ok(TokenKind::VAR),
             "while" => Ok(TokenKind::WHILE),
+            "break" => Ok(TokenKind::BREAK),
             other => Ok(TokenKind::IDENTIFIER(other.to_owned())),
         }
     }

@@ -575,10 +575,12 @@ impl Interpreter {
         let env = Environment::default();
         let globals = env.clone();
 
-        globals.define(
-            &Token::with_kind(TokenKind::IDENTIFIER("clock".to_string())),
-            Value::new_callable(Box::new(NativeClock {})),
-        ).expect("Define global failed");
+        globals
+            .define(
+                &Token::with_kind(TokenKind::IDENTIFIER("clock".to_string())),
+                Value::new_callable(Box::new(NativeClock {})),
+            )
+            .expect("Define global failed");
 
         Interpreter { env, globals }
     }

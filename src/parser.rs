@@ -91,7 +91,11 @@ impl fmt::Display for SyntaxError {
             }
             SyntaxError::ExpectIdentifier(t, cxt) => {
                 write_position(f, t)?;
-                write!(f, "expect an identifier, required by {}, but '{:?}' found",cxt, t)
+                write!(
+                    f,
+                    "expect an identifier, required by {}, but '{:?}' found",
+                    cxt, t
+                )
             }
             SyntaxError::InvalidAssignTarget(t) => {
                 write_position(f, t)?;
@@ -556,7 +560,10 @@ impl<'a> Parser<'a> {
             self.consume_or_err(&TokenKind::SEMICOLON)?;
             Ok(Stmt::new_variable(token, init))
         } else {
-            Err(SyntaxError::ExpectIdentifier(self.box_current_token(), SynCxt::VarDecl))
+            Err(SyntaxError::ExpectIdentifier(
+                self.box_current_token(),
+                SynCxt::VarDecl,
+            ))
         }
     }
 

@@ -10,7 +10,15 @@ use std::ops::Deref;
 // Clonable trait object
 #[derive(Debug, Clone)]
 pub struct Callable {
-    inner: Rc<RefCell<dyn LoxCallable>>,
+    inner: Rc<RefCell<Box<dyn LoxCallable>>>,
+}
+
+impl Callable {
+    pub fn new(callee: Box<dyn LoxCallable>) -> Callable {
+        Callable {
+            inner: Rc::new(RefCell::new(callee)),
+        }
+    }
 }
 
 impl LoxCallable for Callable {
@@ -42,6 +50,30 @@ pub trait LoxCallable: fmt::Debug {
         interpreter: &mut Interpreter,
         args: Vec<Value>,
     ) -> RuntimeResult<Value>;
+}
+
+use std::time::{SystemTime, UNIX_EPOCH};
+
+#[derive(Debug)]
+struct NativeClock;
+
+impl LoxCallable for NativeClock {
+    fn arity(&self) -> u8 {
+        0
+    }
+
+    fn call(
+        &mut self,
+        _: &mut Interpreter,
+        _: Vec<Value>,
+    ) -> RuntimeResult<Value> {
+        Ok(Value::Number(
+            SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .unwrap()
+                .as_secs_f64(),
+        ))
+    }
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -81,6 +113,10 @@ impl Value {
             _ => true,
         }
     }
+
+    pub fn new_callable(callee: Box<dyn LoxCallable>) -> Value {
+        Value::Callable(Callable::new(callee))
+    }
 }
 
 impl std::default::Default for Value {
@@ -108,6 +144,7 @@ impl fmt::Display for Value {
 type BoxToken = Box<Token>;
 type RuntimeResult<T> = Result<T, RuntimeError>;
 
+#[derive(Debug)]
 pub enum RuntimeError {
     UnaryMismatchedType(BoxToken),
     BinaryMismatchedType(BoxToken),
@@ -186,8 +223,8 @@ impl Interpret for Expr {
 
 impl Interpret for CallExpr {
     fn interpret(&self, interpreter: &mut Interpreter) -> RuntimeResult<Value> {
-        use super::ast::ast_printer::AstPrint;
-        println!("{}", self.print_ast());
+        // use super::ast::ast_printer::AstPrint;
+        // println!("{}", self.print_ast());
 
         // check type
         if let Value::Callable(mut callee) =
@@ -530,13 +567,20 @@ impl Environment {
 
 pub struct Interpreter {
     env: Environment,
+    globals: Environment,
 }
 
 impl Interpreter {
     pub fn new() -> Self {
-        Interpreter {
-            env: Environment::default(),
-        }
+        let env = Environment::default();
+        let globals = env.clone();
+
+        globals.define(
+            &Token::with_kind(TokenKind::IDENTIFIER("clock".to_string())),
+            Value::new_callable(Box::new(NativeClock {})),
+        ).expect("Define global failed");
+
+        Interpreter { env, globals }
     }
 
     pub fn push_new_env(&mut self) {

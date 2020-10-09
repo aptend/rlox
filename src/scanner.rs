@@ -74,7 +74,6 @@ impl Token {
         Token { position, kind }
     }
 
-    #[cfg(test)]
     pub(crate) fn with_kind(kind: TokenKind) -> Token {
         Token {
             position: Position::default(),

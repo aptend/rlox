@@ -10,6 +10,7 @@ pub enum Stmt {
     If(IfStmt),
     While(WhileStmt),
     Function(FunctionStmt),
+    Return(ReturnStmt),
     Break,
 }
 
@@ -54,6 +55,10 @@ impl Stmt {
         Stmt::Break
     }
 
+    pub fn new_return(ret_tk: Token, value: Expr) -> Stmt {
+        Stmt::Return(ReturnStmt { ret_tk, value })
+    }
+
     pub fn new_function(name: Token, params: Vec<Token>, body: Stmt) -> Stmt {
         Stmt::Function(FunctionStmt {
             inner: Rc::new(FuncInner {
@@ -83,6 +88,11 @@ pub struct IfStmt {
 pub struct WhileStmt {
     pub cond: Expr,
     pub body: Box<Stmt>,
+}
+
+pub struct ReturnStmt {
+    pub ret_tk: Token,
+    pub value: Expr,
 }
 
 // Function's body will be stored in environment for lazy computation

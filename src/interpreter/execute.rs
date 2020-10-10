@@ -30,7 +30,15 @@ impl Execute for Stmt {
             Stmt::While(w) => w.execute(interpreter),
             Stmt::Function(f) => f.execute(interpreter),
             Stmt::Break => Err(RuntimeError::BreakControl),
+            Stmt::Return(r) => r.execute(interpreter),
         }
+    }
+}
+
+impl Execute for ReturnStmt {
+    fn execute(&self, interpreter: &mut Interpreter) -> RuntimeResult<()> {
+        let val = self.value.interpret(interpreter)?;
+        Err(RuntimeError::ReturnControl(val))
     }
 }
 

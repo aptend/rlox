@@ -26,9 +26,6 @@ impl Interpret for Expr {
 
 impl Interpret for CallExpr {
     fn interpret(&self, interpreter: &mut Interpreter) -> RuntimeResult<Value> {
-        // use super::ast::ast_printer::AstPrint;
-        // println!("{}", self.print_ast());
-
         // check type
         if let Value::Callable(callee) = self.callee.interpret(interpreter)? {
             // check arity
@@ -45,7 +42,10 @@ impl Interpret for CallExpr {
             for arg in &self.arguments {
                 args.push(arg.interpret(interpreter)?);
             }
-            callee.call(interpreter, args)
+            match callee.call(interpreter, args) {
+                Err(RuntimeError::ReturnControl(v)) | Ok(v) => Ok(v),
+                Err(e) => Err(e),
+            }
         } else {
             Err(RuntimeError::NonCallable(Box::new(self.pos_tk.clone())))
         }

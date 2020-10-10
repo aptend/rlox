@@ -1,4 +1,4 @@
-use super::{Token, TokenKind};
+use super::{Token, TokenKind, Value};
 use std::fmt;
 
 type BoxToken = Box<Token>;
@@ -15,6 +15,7 @@ pub enum RuntimeError {
 
     // Not visible for user, interpreter use it to break loop
     BreakControl,
+    ReturnControl(Value),
 }
 
 fn write_position(f: &mut fmt::Formatter<'_>, token: &Token) -> fmt::Result {
@@ -54,6 +55,9 @@ impl fmt::Display for RuntimeError {
                 write!(f, "Expected {} arguments but got {}", expect, got)
             }
             RuntimeError::BreakControl => write!(f, "break control signal"),
+            RuntimeError::ReturnControl(_) => {
+                write!(f, "return control signal")
+            }
         }
     }
 }

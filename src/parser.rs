@@ -66,6 +66,7 @@ pub enum SynCxt {
     VarDecl,
     FunDecl,
     MethodDecl,
+    ReturnStmt,
 }
 
 impl fmt::Display for SynCxt {
@@ -74,6 +75,7 @@ impl fmt::Display for SynCxt {
             SynCxt::VarDecl => write!(f, "variable declaration"),
             SynCxt::FunDecl => write!(f, "function declaration"),
             SynCxt::MethodDecl => write!(f, "method declaration"),
+            SynCxt::ReturnStmt => write!(f, "return statement"),
         }
     }
 }
@@ -499,9 +501,9 @@ impl<'a> Parser<'a> {
         self.consume_or_err(&LEFT_PAREN, None)?;
         let cond = self.expression()?;
         self.consume_or_err(&RIGHT_PAREN, None)?;
-        let taken = self.breakable_stmt()?;
+        let taken = self.statement()?;
         if self.advance_if_eq(&ELSE).is_some() {
-            Ok(Stmt::new_if(cond, taken, Some(self.breakable_stmt()?)))
+            Ok(Stmt::new_if(cond, taken, Some(self.statement()?)))
         } else {
             Ok(Stmt::new_if(cond, taken, None))
         }
@@ -512,9 +514,20 @@ impl<'a> Parser<'a> {
         let cond = self.expression()?;
         self.consume_or_err(&RIGHT_PAREN, None)?;
         self.n_loop += 1;
-        let body = self.breakable_stmt()?;
+        let body = self.statement()?;
         self.n_loop -= 1;
         Ok(Stmt::new_while(cond, body))
+    }
+
+    fn return_stmt(&mut self, ret_tk: Token) -> ParseResult<Stmt> {
+        if self.advance_if_eq(&SEMICOLON).is_some() {
+            // value is nil
+            Ok(Stmt::new_return(ret_tk, Expr::default()))
+        } else {
+            let value = self.expression()?;
+            self.consume_or_err(&SEMICOLON, None)?;
+            Ok(Stmt::new_return(ret_tk, value))
+        }
     }
 
     fn for_stmt(&mut self) -> ParseResult<Stmt> {
@@ -545,7 +558,7 @@ impl<'a> Parser<'a> {
         };
 
         self.n_loop += 1;
-        let mut body = self.breakable_stmt()?;
+        let mut body = self.statement()?;
         self.n_loop -= 1;
 
         // assemble body and increment
@@ -562,18 +575,6 @@ impl<'a> Parser<'a> {
         Ok(body)
     }
 
-    fn breakable_stmt(&mut self) -> ParseResult<Stmt> {
-        if let Some(brk_tk) = self.advance_if_eq(&BREAK) {
-            if self.n_loop > 0 {
-                self.consume_or_err(&SEMICOLON, None)?;
-                return Ok(Stmt::new_break());
-            } else {
-                return Err(SyntaxError::BreakOutside(Box::new(brk_tk)));
-            }
-        }
-        self.statement()
-    }
-
     fn statement(&mut self) -> ParseResult<Stmt> {
         if self.advance_if_eq(&PRINT).is_some() {
             return self.print_stmt();
@@ -587,8 +588,19 @@ impl<'a> Parser<'a> {
         if self.advance_if_eq(&FOR).is_some() {
             return self.for_stmt();
         }
+        if let Some(ret_tk) = self.advance_if_eq(&RETURN) {
+            return self.return_stmt(ret_tk);
+        }
         if self.advance_if_eq(&LEFT_BRACE).is_some() {
             return self.block_stmt();
+        }
+        if let Some(brk_tk) = self.advance_if_eq(&BREAK) {
+            if self.n_loop > 0 {
+                self.consume_or_err(&SEMICOLON, None)?;
+                return Ok(Stmt::new_break());
+            } else {
+                return Err(SyntaxError::BreakOutside(Box::new(brk_tk)));
+            }
         }
         self.expression_stmt()
     }
@@ -640,7 +652,7 @@ impl<'a> Parser<'a> {
         if self.advance_if_eq(&FUN).is_some() {
             return self.fun_decl_stmt(Some(SynCxt::FunDecl));
         }
-        self.breakable_stmt()
+        self.statement()
     }
 
     pub fn parse(&mut self) -> Result<Vec<Stmt>, Vec<SyntaxError>> {

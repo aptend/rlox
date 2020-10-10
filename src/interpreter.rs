@@ -73,11 +73,7 @@ impl LoxCallable for NativeClock {
         0
     }
 
-    fn call(
-        &self,
-        _: &mut Interpreter,
-        _: Vec<Value>,
-    ) -> RuntimeResult<Value> {
+    fn call(&self, _: &mut Interpreter, _: Vec<Value>) -> RuntimeResult<Value> {
         Ok(Value::Number(
             SystemTime::now()
                 .duration_since(UNIX_EPOCH)
@@ -276,9 +272,7 @@ impl Interpret for CallExpr {
         // println!("{}", self.print_ast());
 
         // check type
-        if let Value::Callable(callee) =
-            self.callee.interpret(interpreter)?
-        {
+        if let Value::Callable(callee) = self.callee.interpret(interpreter)? {
             // check arity
             let (expect, got) = (callee.arity(), self.arguments.len() as u8);
             if expect != got {

@@ -11,6 +11,52 @@ use std::fmt;
 
 use crate::ast::{Expr, Stmt};
 use crate::scanner::*;
+use lazy_static::lazy_static;
+
+lazy_static! {
+    static ref LEFT_PAREN: TokenKind = TokenKind::LEFT_PAREN;
+    static ref RIGHT_PAREN: TokenKind = TokenKind::RIGHT_PAREN;
+    static ref LEFT_BRACE: TokenKind = TokenKind::LEFT_BRACE;
+    static ref RIGHT_BRACE: TokenKind = TokenKind::RIGHT_BRACE;
+    static ref COMMA: TokenKind = TokenKind::COMMA;
+    static ref DOT: TokenKind = TokenKind::DOT;
+    static ref MINUS: TokenKind = TokenKind::MINUS;
+    static ref PLUS: TokenKind = TokenKind::PLUS;
+    static ref SEMICOLON: TokenKind = TokenKind::SEMICOLON;
+    static ref SLASH: TokenKind = TokenKind::SLASH;
+    static ref STAR: TokenKind = TokenKind::STAR;
+    static ref SPACE: TokenKind = TokenKind::SPACE;
+    static ref COMMENT: TokenKind = TokenKind::COMMENT;
+    static ref BANG: TokenKind = TokenKind::BANG;
+    static ref BANG_EQUAL: TokenKind = TokenKind::BANG_EQUAL;
+    static ref EQUAL: TokenKind = TokenKind::EQUAL;
+    static ref EQUAL_EQUAL: TokenKind = TokenKind::EQUAL_EQUAL;
+    static ref GREATER: TokenKind = TokenKind::GREATER;
+    static ref GREATER_EQUAL: TokenKind = TokenKind::GREATER_EQUAL;
+    static ref LESS: TokenKind = TokenKind::LESS;
+    static ref LESS_EQUAL: TokenKind = TokenKind::LESS_EQUAL;
+    static ref IDENTIFIER: TokenKind = TokenKind::IDENTIFIER(String::new());
+    static ref STRING: TokenKind = TokenKind::STRING(String::new());
+    static ref NUMBER: TokenKind = TokenKind::NUMBER(0.0);
+    static ref AND: TokenKind = TokenKind::AND;
+    static ref CLASS: TokenKind = TokenKind::CLASS;
+    static ref ELSE: TokenKind = TokenKind::ELSE;
+    static ref FALSE: TokenKind = TokenKind::FALSE;
+    static ref FUN: TokenKind = TokenKind::FUN;
+    static ref FOR: TokenKind = TokenKind::FOR;
+    static ref IF: TokenKind = TokenKind::IF;
+    static ref NIL: TokenKind = TokenKind::NIL;
+    static ref OR: TokenKind = TokenKind::OR;
+    static ref PRINT: TokenKind = TokenKind::PRINT;
+    static ref RETURN: TokenKind = TokenKind::RETURN;
+    static ref SUPER: TokenKind = TokenKind::SUPER;
+    static ref THIS: TokenKind = TokenKind::THIS;
+    static ref TRUE: TokenKind = TokenKind::TRUE;
+    static ref VAR: TokenKind = TokenKind::VAR;
+    static ref WHILE: TokenKind = TokenKind::WHILE;
+    static ref BREAK: TokenKind = TokenKind::BREAK;
+    static ref EOF: TokenKind = TokenKind::EOF;
+}
 
 type BoxToken = Box<Token>;
 type ParseResult<T> = Result<T, SyntaxError>;
@@ -53,7 +99,7 @@ impl std::convert::From<ScanError> for SyntaxError {
 }
 
 fn write_position(f: &mut fmt::Formatter<'_>, token: &Token) -> fmt::Result {
-    if token.kind == TokenKind::EOF {
+    if &token.kind == &*EOF {
         write!(f, "[the last line] SyntaxError: ")
     } else {
         let (line, col) = (token.position.line, token.position.column);
@@ -181,8 +227,8 @@ impl<'a> Parser<'a> {
         None
     }
 
-    fn advance_if_contains(&mut self, kinds: &[TokenKind]) -> Option<Token> {
-        if self.peek_check(|k| kinds.contains(k)) {
+    fn advance_if_contains(&mut self, kinds: &[&TokenKind]) -> Option<Token> {
+        if self.peek_check(|k| kinds.contains(&k)) {
             return self.advance();
         }
         None
@@ -244,39 +290,37 @@ impl<'a> Parser<'a> {
     /// ----------------------------------------------------------------------
 
     fn primary(&mut self) -> ParseResult<Expr> {
-        if let Some(t) = self.advance_if_eq(&TokenKind::NUMBER(0.0)) {
+        if let Some(t) = self.advance_if_eq(&NUMBER) {
             if let TokenKind::NUMBER(f) = t.kind {
                 return Ok(Expr::new_number_literal(f));
             }
         }
-        if let Some(t) = self.advance_if_eq(&TokenKind::STRING(String::new())) {
+        if let Some(t) = self.advance_if_eq(&STRING) {
             // move string out of token before droping it
             if let TokenKind::STRING(s) = t.kind {
                 return Ok(Expr::new_string_literal(s));
             }
         }
-        if self.advance_if_eq(&TokenKind::TRUE).is_some() {
+        if self.advance_if_eq(&TRUE).is_some() {
             return Ok(Expr::new_bool_literal(true));
         }
 
-        if self.advance_if_eq(&TokenKind::FALSE).is_some() {
+        if self.advance_if_eq(&FALSE).is_some() {
             return Ok(Expr::new_bool_literal(false));
         }
 
-        if self.advance_if_eq(&TokenKind::NIL).is_some() {
+        if self.advance_if_eq(&NIL).is_some() {
             return Ok(Expr::default());
         }
 
-        if let Some(t) =
-            self.advance_if_eq(&TokenKind::IDENTIFIER(String::new()))
-        {
+        if let Some(t) = self.advance_if_eq(&IDENTIFIER) {
             // move this token into expr
             return Ok(Expr::new_variable(t));
         }
 
-        if self.advance_if_eq(&TokenKind::LEFT_PAREN).is_some() {
+        if self.advance_if_eq(&LEFT_PAREN).is_some() {
             let expr = self.expression()?;
-            self.consume_or_err(&TokenKind::RIGHT_PAREN)?;
+            self.consume_or_err(&RIGHT_PAREN)?;
             return Ok(Expr::new_grouping(expr));
         }
         Err(SyntaxError::ExpectExpression(self.box_current_token()))
@@ -286,7 +330,7 @@ impl<'a> Parser<'a> {
         let mut callee = self.primary()?;
 
         loop {
-            if self.advance_if_eq(&TokenKind::LEFT_PAREN).is_some() {
+            if self.advance_if_eq(&LEFT_PAREN).is_some() {
                 callee = self.finish_call(callee)?;
             } else {
                 break;
@@ -298,7 +342,7 @@ impl<'a> Parser<'a> {
 
     fn finish_call(&mut self, mut callee: Expr) -> ParseResult<Expr> {
         let mut arguments = vec![];
-        if self.peek_check(|k| k != &TokenKind::RIGHT_PAREN) {
+        if self.peek_check(|k| k != &*RIGHT_PAREN) {
             // collect all arguments
             loop {
                 if arguments.len() >= 255 {
@@ -308,21 +352,19 @@ impl<'a> Parser<'a> {
                     self.errors.push(SyntaxError::TooManyArguments(tk));
                 }
                 arguments.push(self.expression()?);
-                if self.advance_if_eq(&TokenKind::COMMA).is_none() {
+                if self.advance_if_eq(&COMMA).is_none() {
                     break;
                 }
             }
         }
-        let paren = self.consume_or_err(&TokenKind::RIGHT_PAREN)?;
+        let paren = self.consume_or_err(&RIGHT_PAREN)?;
 
         callee = Expr::new_call(callee, paren, arguments);
         Ok(callee)
     }
 
     fn unary(&mut self) -> ParseResult<Expr> {
-        if let Some(op) =
-            self.advance_if_contains(&[TokenKind::MINUS, TokenKind::BANG])
-        {
+        if let Some(op) = self.advance_if_contains(&[&MINUS, &BANG]) {
             let right = self.unary()?;
             Ok(Expr::new_unary(op, right))
         } else {
@@ -332,9 +374,7 @@ impl<'a> Parser<'a> {
 
     fn factor(&mut self) -> ParseResult<Expr> {
         let mut left = self.unary()?;
-        while let Some(op) =
-            self.advance_if_contains(&[TokenKind::STAR, TokenKind::SLASH])
-        {
+        while let Some(op) = self.advance_if_contains(&[&STAR, &SLASH]) {
             let right = self.unary()?;
             left = Expr::new_binary(op, left, right);
         }
@@ -343,9 +383,7 @@ impl<'a> Parser<'a> {
 
     fn term(&mut self) -> ParseResult<Expr> {
         let mut left = self.factor()?;
-        while let Some(op) =
-            self.advance_if_contains(&[TokenKind::PLUS, TokenKind::MINUS])
-        {
+        while let Some(op) = self.advance_if_contains(&[&PLUS, &MINUS]) {
             let right = self.factor()?;
             left = Expr::new_binary(op, left, right);
         }
@@ -355,10 +393,10 @@ impl<'a> Parser<'a> {
     fn comparison(&mut self) -> ParseResult<Expr> {
         let mut left = self.term()?;
         while let Some(op) = self.advance_if_contains(&[
-            TokenKind::LESS,
-            TokenKind::LESS_EQUAL,
-            TokenKind::GREATER,
-            TokenKind::GREATER_EQUAL,
+            &LESS,
+            &LESS_EQUAL,
+            &GREATER,
+            &GREATER_EQUAL,
         ]) {
             let right = self.term()?;
             left = Expr::new_binary(op, left, right);
@@ -368,10 +406,9 @@ impl<'a> Parser<'a> {
 
     fn equality(&mut self) -> ParseResult<Expr> {
         let mut left = self.comparison()?;
-        while let Some(op) = self.advance_if_contains(&[
-            TokenKind::EQUAL_EQUAL,
-            TokenKind::BANG_EQUAL,
-        ]) {
+        while let Some(op) =
+            self.advance_if_contains(&[&EQUAL_EQUAL, &BANG_EQUAL])
+        {
             let right = self.comparison()?;
             left = Expr::new_binary(op, left, right);
         }
@@ -380,7 +417,7 @@ impl<'a> Parser<'a> {
 
     fn and_expr(&mut self) -> ParseResult<Expr> {
         let mut left = self.equality()?;
-        while let Some(op) = self.advance_if_eq(&TokenKind::AND) {
+        while let Some(op) = self.advance_if_eq(&AND) {
             let right = self.equality()?;
             left = Expr::new_logical(op, left, right);
         }
@@ -389,7 +426,7 @@ impl<'a> Parser<'a> {
 
     fn or_expr(&mut self) -> ParseResult<Expr> {
         let mut left = self.and_expr()?;
-        while let Some(op) = self.advance_if_eq(&TokenKind::OR) {
+        while let Some(op) = self.advance_if_eq(&OR) {
             let right = self.and_expr()?;
             left = Expr::new_logical(op, left, right);
         }
@@ -400,7 +437,7 @@ impl<'a> Parser<'a> {
         // parse left-value, it is also an expression, like x.y = 42
         // we check if it is valid later
         let l_value = self.or_expr()?;
-        if let Some(equal_tk) = self.advance_if_eq(&TokenKind::EQUAL) {
+        if let Some(equal_tk) = self.advance_if_eq(&EQUAL) {
             if let Expr::Variable(v) = l_value {
                 // it is a valid assignment, so we continue to
                 // parse right value recursively.
@@ -425,13 +462,13 @@ impl<'a> Parser<'a> {
 
     fn print_stmt(&mut self) -> ParseResult<Stmt> {
         let expr = self.expression()?;
-        self.consume_or_err(&TokenKind::SEMICOLON)?;
+        self.consume_or_err(&SEMICOLON)?;
         Ok(Stmt::new_print(expr))
     }
 
     fn expression_stmt(&mut self) -> ParseResult<Stmt> {
         let expr = self.expression()?;
-        self.consume_or_err(&TokenKind::SEMICOLON)?;
+        self.consume_or_err(&SEMICOLON)?;
         Ok(Stmt::new_expr(expr))
     }
 
@@ -440,7 +477,7 @@ impl<'a> Parser<'a> {
 
         // if there is a missing right brace,
         // the SyntaxError will be reported at EOF, akward.
-        while self.peek_check(|k| k != &TokenKind::RIGHT_BRACE) {
+        while self.peek_check(|k| k != &*RIGHT_BRACE) {
             match self.declaration() {
                 Ok(stmt) => stmts.push(stmt),
                 Err(err) => {
@@ -450,16 +487,16 @@ impl<'a> Parser<'a> {
             }
         }
 
-        self.consume_or_err(&TokenKind::RIGHT_BRACE)?;
+        self.consume_or_err(&RIGHT_BRACE)?;
         Ok(Stmt::new_block(stmts))
     }
 
     fn if_statement(&mut self) -> ParseResult<Stmt> {
-        self.consume_or_err(&TokenKind::LEFT_PAREN)?;
+        self.consume_or_err(&LEFT_PAREN)?;
         let cond = self.expression()?;
-        self.consume_or_err(&TokenKind::RIGHT_PAREN)?;
+        self.consume_or_err(&RIGHT_PAREN)?;
         let taken = self.breakable_stmt()?;
-        if self.advance_if_eq(&TokenKind::ELSE).is_some() {
+        if self.advance_if_eq(&ELSE).is_some() {
             Ok(Stmt::new_if(cond, taken, Some(self.breakable_stmt()?)))
         } else {
             Ok(Stmt::new_if(cond, taken, None))
@@ -467,9 +504,9 @@ impl<'a> Parser<'a> {
     }
 
     fn while_stmt(&mut self) -> ParseResult<Stmt> {
-        self.consume_or_err(&TokenKind::LEFT_PAREN)?;
+        self.consume_or_err(&LEFT_PAREN)?;
         let cond = self.expression()?;
-        self.consume_or_err(&TokenKind::RIGHT_PAREN)?;
+        self.consume_or_err(&RIGHT_PAREN)?;
         self.n_loop += 1;
         let body = self.breakable_stmt()?;
         self.n_loop -= 1;
@@ -477,30 +514,29 @@ impl<'a> Parser<'a> {
     }
 
     fn for_stmt(&mut self) -> ParseResult<Stmt> {
-        self.consume_or_err(&TokenKind::LEFT_PAREN)?;
+        self.consume_or_err(&LEFT_PAREN)?;
 
-        let initial = if self.advance_if_eq(&TokenKind::SEMICOLON).is_some() {
+        let initial = if self.advance_if_eq(&SEMICOLON).is_some() {
             None
-        } else if self.advance_if_eq(&TokenKind::VAR).is_some() {
+        } else if self.advance_if_eq(&VAR).is_some() {
             Some(self.var_decl_stmt()?)
         } else {
             Some(self.expression_stmt()?)
         };
 
-        let condition = if self.advance_if_eq(&TokenKind::SEMICOLON).is_some() {
+        let condition = if self.advance_if_eq(&SEMICOLON).is_some() {
             Expr::new_bool_literal(true)
         } else {
             let cond = self.expression()?;
-            self.consume_or_err(&TokenKind::SEMICOLON)?;
+            self.consume_or_err(&SEMICOLON)?;
             cond
         };
 
-        let increment = if self.advance_if_eq(&TokenKind::RIGHT_PAREN).is_some()
-        {
+        let increment = if self.advance_if_eq(&RIGHT_PAREN).is_some() {
             None
         } else {
             let inc = self.expression()?;
-            self.consume_or_err(&TokenKind::RIGHT_PAREN)?;
+            self.consume_or_err(&RIGHT_PAREN)?;
             Some(inc)
         };
 
@@ -523,9 +559,9 @@ impl<'a> Parser<'a> {
     }
 
     fn breakable_stmt(&mut self) -> ParseResult<Stmt> {
-        if let Some(brk_tk) = self.advance_if_eq(&TokenKind::BREAK) {
+        if let Some(brk_tk) = self.advance_if_eq(&BREAK) {
             if self.n_loop > 0 {
-                self.consume_or_err(&TokenKind::SEMICOLON)?;
+                self.consume_or_err(&SEMICOLON)?;
                 return Ok(Stmt::new_break());
             } else {
                 return Err(SyntaxError::BreakOutside(Box::new(brk_tk)));
@@ -535,33 +571,31 @@ impl<'a> Parser<'a> {
     }
 
     fn statement(&mut self) -> ParseResult<Stmt> {
-        if self.advance_if_eq(&TokenKind::PRINT).is_some() {
+        if self.advance_if_eq(&PRINT).is_some() {
             return self.print_stmt();
         }
-        if self.advance_if_eq(&TokenKind::IF).is_some() {
+        if self.advance_if_eq(&IF).is_some() {
             return self.if_statement();
         }
-        if self.advance_if_eq(&TokenKind::WHILE).is_some() {
+        if self.advance_if_eq(&WHILE).is_some() {
             return self.while_stmt();
         }
-        if self.advance_if_eq(&TokenKind::FOR).is_some() {
+        if self.advance_if_eq(&FOR).is_some() {
             return self.for_stmt();
         }
-        if self.advance_if_eq(&TokenKind::LEFT_BRACE).is_some() {
+        if self.advance_if_eq(&LEFT_BRACE).is_some() {
             return self.block_stmt();
         }
         self.expression_stmt()
     }
 
     fn var_decl_stmt(&mut self) -> ParseResult<Stmt> {
-        if let Some(token) =
-            self.advance_if_eq(&TokenKind::IDENTIFIER(String::new()))
-        {
+        if let Some(token) = self.advance_if_eq(&IDENTIFIER) {
             let mut init = Expr::default();
-            if self.advance_if_eq(&TokenKind::EQUAL).is_some() {
+            if self.advance_if_eq(&EQUAL).is_some() {
                 init = self.expression()?;
             }
-            self.consume_or_err(&TokenKind::SEMICOLON)?;
+            self.consume_or_err(&SEMICOLON)?;
             Ok(Stmt::new_variable(token, init))
         } else {
             Err(SyntaxError::ExpectIdentifier(
@@ -572,35 +606,34 @@ impl<'a> Parser<'a> {
     }
 
     fn fun_decl_stmt(&mut self, cxt: SynCxt) -> ParseResult<Stmt> {
-        let ident_kind = TokenKind::IDENTIFIER(String::new());
-        let name = self.consume_or_err(&ident_kind)?;
-        self.consume_or_err(&TokenKind::LEFT_PAREN)?;
+        let name = self.consume_or_err(&IDENTIFIER)?;
+        self.consume_or_err(&LEFT_PAREN)?;
 
         // do the same thing in finish_call
         let mut params = vec![];
-        if self.peek_check(|k| k != &TokenKind::RIGHT_PAREN) {
+        if self.peek_check(|k| k != &*RIGHT_PAREN) {
             loop {
                 if params.len() >= 255 {
                     let tk = self.box_current_token();
                     self.errors.push(SyntaxError::TooManyArguments(tk));
                 }
-                params.push(self.consume_or_err(&ident_kind)?);
-                if self.advance_if_eq(&TokenKind::COMMA).is_none() {
+                params.push(self.consume_or_err(&IDENTIFIER)?);
+                if self.advance_if_eq(&COMMA).is_none() {
                     break;
                 }
             }
         }
-        self.consume_or_err(&TokenKind::RIGHT_PAREN)?;
-        self.consume_or_err(&TokenKind::LEFT_BRACE)?;
+        self.consume_or_err(&RIGHT_PAREN)?;
+        self.consume_or_err(&LEFT_BRACE)?;
         let body = self.block_stmt()?;
         Ok(Stmt::new_function(name, params, body))
     }
 
     fn declaration(&mut self) -> ParseResult<Stmt> {
-        if self.advance_if_eq(&TokenKind::VAR).is_some() {
+        if self.advance_if_eq(&VAR).is_some() {
             return self.var_decl_stmt();
         }
-        if self.advance_if_eq(&TokenKind::FUN).is_some() {
+        if self.advance_if_eq(&FUN).is_some() {
             return self.fun_decl_stmt(SynCxt::FunDecl);
         }
         self.breakable_stmt()

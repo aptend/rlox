@@ -204,6 +204,10 @@ impl<'a> Parser<'a> {
                 }
 
                 TokenKind::LEFT_PAREN => Err(SyntaxError::ExpectLeftParen(tk)),
+
+                TokenKind::IDENTIFIER(_) => {
+                    Err(SyntaxError::ExpectIdentifier(tk, SynCxt::VarDecl))
+                }
                 _ => unimplemented!(),
             }
         }
@@ -567,9 +571,37 @@ impl<'a> Parser<'a> {
         }
     }
 
+    fn fun_decl_stmt(&mut self, cxt: SynCxt) -> ParseResult<Stmt> {
+        let ident_kind = TokenKind::IDENTIFIER(String::new());
+        let name = self.consume_or_err(&ident_kind)?;
+        self.consume_or_err(&TokenKind::LEFT_PAREN)?;
+
+        // do the same thing in finish_call
+        let mut params = vec![];
+        if self.peek_check(|k| k != &TokenKind::RIGHT_PAREN) {
+            loop {
+                if params.len() >= 255 {
+                    let tk = self.box_current_token();
+                    self.errors.push(SyntaxError::TooManyArguments(tk));
+                }
+                params.push(self.consume_or_err(&ident_kind)?);
+                if self.advance_if_eq(&TokenKind::COMMA).is_none() {
+                    break;
+                }
+            }
+        }
+        self.consume_or_err(&TokenKind::RIGHT_PAREN)?;
+        self.consume_or_err(&TokenKind::LEFT_BRACE)?;
+        let body = self.block_stmt()?;
+        Ok(Stmt::new_function(name, params, body))
+    }
+
     fn declaration(&mut self) -> ParseResult<Stmt> {
         if self.advance_if_eq(&TokenKind::VAR).is_some() {
             return self.var_decl_stmt();
+        }
+        if self.advance_if_eq(&TokenKind::FUN).is_some() {
+            return self.fun_decl_stmt(SynCxt::FunDecl);
         }
         self.breakable_stmt()
     }

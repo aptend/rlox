@@ -1,11 +1,30 @@
-fun odd_or_even(x) {
-    var xx = (x / 2) * 2;
-    if (xx == x) {
-        print "x is even";
-    } else {
-        print "x is odd";
+fun fib_less_than(n) {
+    var a = 0;
+    var b = 1;
+
+    while (a < n) {
+      print a;
+      var temp = a;
+      a = b;
+      b = temp + b;
     }
 }
+
+fun count(n) {
+    if (n > 1) count(n-1);
+    print n;
+}
+
+fun sayHi(first, last) {
+  print "Hi, " + first + " " + last + "!";
+}
+
+
+fib_less_than(100);
+print "-----------------------";
+count(10);
+print "-----------------------";
+sayHi("Dear", "Reader");
 
 
 //fun fib_recursive(n) {
@@ -17,10 +36,6 @@ fun odd_or_even(x) {
 //    }
 //    return fib(n-2) + fib(n-1);
 //}
-
-
-print odd_or_even(42);
-print odd_or_even(41);
 
 //print fib_recursive(5);
 

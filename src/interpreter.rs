@@ -8,7 +8,7 @@ use std::rc::Rc;
 
 use std::ops::Deref;
 // Clonable trait object
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct Callable {
     inner: Rc<RefCell<Box<dyn LoxCallable>>>,
 }
@@ -27,11 +27,11 @@ impl LoxCallable for Callable {
     }
 
     fn call(
-        &mut self,
+        &self,
         interpreter: &mut Interpreter,
         args: Vec<Value>,
     ) -> RuntimeResult<Value> {
-        self.inner.borrow_mut().call(interpreter, args)
+        self.inner.borrow().call(interpreter, args)
     }
 }
 
@@ -42,11 +42,17 @@ impl PartialEq for Callable {
     }
 }
 
+impl fmt::Debug for Callable {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{:?}", self.inner.borrow())
+    }
+}
+
 pub trait LoxCallable: fmt::Debug {
     fn arity(&self) -> u8;
 
     fn call(
-        &mut self,
+        &self,
         interpreter: &mut Interpreter,
         args: Vec<Value>,
     ) -> RuntimeResult<Value>;
@@ -54,8 +60,13 @@ pub trait LoxCallable: fmt::Debug {
 
 use std::time::{SystemTime, UNIX_EPOCH};
 
-#[derive(Debug)]
 struct NativeClock;
+
+impl fmt::Debug for NativeClock {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "<native fn clock>")
+    }
+}
 
 impl LoxCallable for NativeClock {
     fn arity(&self) -> u8 {
@@ -63,7 +74,7 @@ impl LoxCallable for NativeClock {
     }
 
     fn call(
-        &mut self,
+        &self,
         _: &mut Interpreter,
         _: Vec<Value>,
     ) -> RuntimeResult<Value> {
@@ -73,6 +84,44 @@ impl LoxCallable for NativeClock {
                 .unwrap()
                 .as_secs_f64(),
         ))
+    }
+}
+
+struct LoxFunction {
+    func_stmt: FunctionStmt,
+}
+
+impl LoxFunction {
+    pub fn new(func_stmt: FunctionStmt) -> Self {
+        LoxFunction { func_stmt }
+    }
+}
+
+impl LoxCallable for LoxFunction {
+    fn arity(&self) -> u8 {
+        self.func_stmt.params.len() as u8
+    }
+
+    fn call(
+        &self,
+        interpreter: &mut Interpreter,
+        args: Vec<Value>,
+    ) -> RuntimeResult<Value> {
+        let local_env =
+            Environment::with_enclosing(interpreter.globals.clone());
+        for (param, arg) in self.func_stmt.params.iter().zip(args) {
+            local_env.define(param, arg)?;
+        }
+        if let Stmt::Block(block) = self.func_stmt.body.deref() {
+            execute_block_with_env(block, interpreter, local_env)?;
+        }
+        Ok(Value::default())
+    }
+}
+
+impl fmt::Debug for LoxFunction {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "<fn {}>", self.func_stmt.name.string_ref().unwrap())
     }
 }
 
@@ -132,7 +181,7 @@ impl fmt::Display for Value {
             Value::String(s) => write!(f, "{}", s.deref()),
             Value::Number(n) => write!(f, "{}", n),
             Value::Boolean(b) => write!(f, "{}", b),
-            Value::Callable(_) => write!(f, "'callee'"),
+            Value::Callable(c) => write!(f, "{:?}", c.deref().deref()),
         }
     }
 }
@@ -227,7 +276,7 @@ impl Interpret for CallExpr {
         // println!("{}", self.print_ast());
 
         // check type
-        if let Value::Callable(mut callee) =
+        if let Value::Callable(callee) =
             self.callee.interpret(interpreter)?
         {
             // check arity
@@ -392,24 +441,46 @@ impl Execute for Stmt {
                 let init_val = v.init.interpret(interpreter)?;
                 interpreter.env.define(&v.name, init_val)
             }
-            Stmt::Block(b) => b.execute(interpreter),
+            Stmt::Block(b) => {
+                let env = Environment::with_enclosing(interpreter.env.clone());
+                execute_block_with_env(b, interpreter, env)
+            }
             Stmt::If(i) => i.execute(interpreter),
             Stmt::While(w) => w.execute(interpreter),
+            Stmt::Function(f) => f.execute(interpreter),
             Stmt::Break => Err(RuntimeError::BreakControl),
         }
     }
 }
 
+impl Execute for FunctionStmt {
+    fn execute(&self, interpreter: &mut Interpreter) -> RuntimeResult<()> {
+        let lox_function = Box::new(LoxFunction::new(self.clone()));
+        interpreter
+            .env
+            .define(&self.name, Value::new_callable(lox_function))?;
+        Ok(())
+    }
+}
+
+// setup new env, execute block, restore old env after executing, anyway.
+fn execute_block_with_env(
+    block: &BlockStmt,
+    interpreter: &mut Interpreter,
+    env: Environment,
+) -> RuntimeResult<()> {
+    let previous = interpreter.env.clone();
+    interpreter.env = env;
+    let result = block.execute(interpreter);
+    interpreter.env = previous;
+    result
+}
+
 impl Execute for BlockStmt {
     fn execute(&self, interpreter: &mut Interpreter) -> RuntimeResult<()> {
-        interpreter.push_new_env();
         for stmt in &self.stmts {
-            if let Err(e) = stmt.execute(interpreter) {
-                interpreter.pop_env();
-                return Err(e);
-            }
+            stmt.execute(interpreter)?
         }
-        interpreter.pop_env();
         Ok(())
     }
 }
@@ -578,7 +649,7 @@ impl Interpreter {
         globals
             .define(
                 &Token::with_kind(TokenKind::IDENTIFIER("clock".to_string())),
-                Value::new_callable(Box::new(NativeClock {})),
+                Value::new_callable(Box::new(NativeClock)),
             )
             .expect("Define global failed");
 

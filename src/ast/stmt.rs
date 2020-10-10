@@ -1,6 +1,7 @@
 use super::Expr;
 use crate::scanner::Token;
-
+use std::ops::Deref;
+use std::rc::Rc;
 pub enum Stmt {
     Expression(Expr),
     Print(Expr),
@@ -8,6 +9,7 @@ pub enum Stmt {
     Block(BlockStmt),
     If(IfStmt),
     While(WhileStmt),
+    Function(FunctionStmt),
     Break,
 }
 
@@ -51,6 +53,16 @@ impl Stmt {
     pub fn new_break() -> Stmt {
         Stmt::Break
     }
+
+    pub fn new_function(name: Token, params: Vec<Token>, body: Stmt) -> Stmt {
+        Stmt::Function(FunctionStmt {
+            inner: Rc::new(FuncInner {
+                name,
+                params,
+                body: Box::new(body),
+            }),
+        })
+    }
 }
 
 pub struct VariableStmt {
@@ -70,5 +82,30 @@ pub struct IfStmt {
 
 pub struct WhileStmt {
     pub cond: Expr,
+    pub body: Box<Stmt>,
+}
+
+// Function's body will be stored in environment for lazy computation
+// which means it will exist in two places simultaneously. We need a cheap
+// cloning way.
+//
+// Another way might be lifetime, interpreter goes after AST.
+// But lifetime approach involves so many structs,
+// like Callable<'ast>, Value<'ast>, Environment<'ast> and so on.
+// Life is short, anyway.
+#[derive(Clone)]
+pub struct FunctionStmt {
+    inner: Rc<FuncInner>,
+}
+
+impl Deref for FunctionStmt {
+    type Target = FuncInner;
+    fn deref(&self) -> &Self::Target {
+        &self.inner
+    }
+}
+pub struct FuncInner {
+    pub name: Token,
+    pub params: Vec<Token>,
     pub body: Box<Stmt>,
 }

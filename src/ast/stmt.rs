@@ -39,7 +39,7 @@ impl Stmt {
         Stmt::If(IfStmt {
             cond,
             taken: Box::new(taken),
-            no_token: no_taken.map(|s| Box::new(s)),
+            no_token: no_taken.map(Box::new),
         })
     }
 

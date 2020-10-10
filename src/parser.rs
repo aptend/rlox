@@ -99,7 +99,7 @@ impl std::convert::From<ScanError> for SyntaxError {
 }
 
 fn write_position(f: &mut fmt::Formatter<'_>, token: &Token) -> fmt::Result {
-    if &token.kind == &*EOF {
+    if token.kind == *EOF {
         write!(f, "[the last line] SyntaxError: ")
     } else {
         let (line, col) = (token.position.line, token.position.column);
@@ -234,7 +234,11 @@ impl<'a> Parser<'a> {
         None
     }
 
-    fn consume_or_err(&mut self, kind: &TokenKind, cxt: Option<SynCxt>) -> ParseResult<Token> {
+    fn consume_or_err(
+        &mut self,
+        kind: &TokenKind,
+        cxt: Option<SynCxt>,
+    ) -> ParseResult<Token> {
         if let Some(tk) = self.advance_if_eq(kind) {
             Ok(tk)
         } else {
@@ -528,7 +532,7 @@ impl<'a> Parser<'a> {
             Expr::new_bool_literal(true)
         } else {
             let cond = self.expression()?;
-            self.consume_or_err(&SEMICOLON,None)?;
+            self.consume_or_err(&SEMICOLON, None)?;
             cond
         };
 
@@ -536,7 +540,7 @@ impl<'a> Parser<'a> {
             None
         } else {
             let inc = self.expression()?;
-            self.consume_or_err(&RIGHT_PAREN,None)?;
+            self.consume_or_err(&RIGHT_PAREN, None)?;
             Some(inc)
         };
 
@@ -606,7 +610,7 @@ impl<'a> Parser<'a> {
     }
 
     fn fun_decl_stmt(&mut self, cxt: Option<SynCxt>) -> ParseResult<Stmt> {
-        let name = self.consume_or_err(&IDENTIFIER, cxt.clone())?;
+        let name = self.consume_or_err(&IDENTIFIER, cxt)?;
         self.consume_or_err(&LEFT_PAREN, None)?;
 
         // do the same thing in finish_call
@@ -623,8 +627,8 @@ impl<'a> Parser<'a> {
                 }
             }
         }
-        self.consume_or_err(&RIGHT_PAREN,None)?;
-        self.consume_or_err(&LEFT_BRACE,None)?;
+        self.consume_or_err(&RIGHT_PAREN, None)?;
+        self.consume_or_err(&LEFT_BRACE, None)?;
         let body = self.block_stmt()?;
         Ok(Stmt::new_function(name, params, body))
     }

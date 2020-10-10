@@ -42,13 +42,6 @@ impl std::clone::Clone for Environment {
 }
 
 impl EnvInner {
-    pub fn new(enclosing: Environment, map: HashMap<String, Value>) -> Self {
-        EnvInner {
-            enclosing: Some(enclosing),
-            map,
-        }
-    }
-
     pub fn with_enclosing(enclosing: Environment) -> Self {
         EnvInner {
             enclosing: Some(enclosing),
@@ -91,16 +84,7 @@ impl EnvInner {
 }
 
 impl Environment {
-    pub fn new(
-        enclosing: Environment,
-        map: HashMap<String, Value>,
-    ) -> Environment {
-        Environment {
-            inner: Rc::new(RefCell::new(EnvInner::new(enclosing, map))),
-        }
-    }
-
-    pub fn enclosing_env(&self) -> Option<Environment> {
+    pub fn _enclosing_env(&self) -> Option<Environment> {
         self.inner.borrow().enclosing.clone()
     }
 

@@ -35,17 +35,6 @@ impl Interpreter {
         Interpreter { env, globals }
     }
 
-    pub fn push_new_env(&mut self) {
-        let env = Environment::with_enclosing(self.env.clone());
-        self.env = env;
-    }
-
-    pub fn pop_env(&mut self) {
-        if let Some(prev) = self.env.enclosing_env() {
-            self.env = prev;
-        }
-    }
-
     pub fn interpret(&mut self, stmts: &[Stmt]) -> RuntimeResult<()> {
         for stmt in stmts {
             stmt.execute(self)?;

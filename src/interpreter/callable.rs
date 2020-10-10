@@ -87,11 +87,12 @@ impl LoxCallable for NativeClock {
 
 pub struct LoxFunction {
     func_stmt: FunctionStmt,
+    closure: Environment,
 }
 
 impl LoxFunction {
-    pub fn new(func_stmt: FunctionStmt) -> Self {
-        LoxFunction { func_stmt }
+    pub fn new(func_stmt: FunctionStmt, closure: Environment) -> Self {
+        LoxFunction { func_stmt, closure }
     }
 }
 
@@ -105,8 +106,7 @@ impl LoxCallable for LoxFunction {
         interpreter: &mut Interpreter,
         args: Vec<Value>,
     ) -> RuntimeResult<Value> {
-        let local_env =
-            Environment::with_enclosing(interpreter.globals.clone());
+        let local_env = Environment::with_enclosing(self.closure.clone());
         for (param, arg) in self.func_stmt.params.iter().zip(args) {
             local_env.define(param, arg)?;
         }

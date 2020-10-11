@@ -80,6 +80,7 @@ impl fmt::Display for SynCxt {
     }
 }
 
+// TODO: factor out BoxToken to common field?
 #[derive(Debug)]
 pub enum SyntaxError {
     ExpectExpression(BoxToken),
@@ -91,6 +92,8 @@ pub enum SyntaxError {
     InvalidAssignTarget(BoxToken),
     BreakOutside(BoxToken),
     TooManyArguments(BoxToken),
+    ReadLocalInitializer(BoxToken),
+    AlreadyExistVarInScope(BoxToken),
     LexError(ScanError),
 }
 
@@ -157,7 +160,26 @@ impl fmt::Display for SyntaxError {
                 write_position(f, t)?;
                 write!(f, "Can't have more than 255 arguments")
             }
+            SyntaxError::ReadLocalInitializer(t) => {
+                write_position(f, t)?;
+                write!(f, "Can't read local variable in its own initializer.")
+            }
+            SyntaxError::AlreadyExistVarInScope(t) => {
+                write_position(f, t)?;
+                write!(f, "Already variable with this name in this scope.")
+            }
         }
+    }
+}
+
+struct ExprKeyGen(std::ops::RangeFrom<u64>);
+
+impl ExprKeyGen {
+    fn new() -> Self {
+        ExprKeyGen(0..)
+    }
+    fn next(&mut self) -> u64 {
+        self.0.next().unwrap()
     }
 }
 
@@ -168,6 +190,9 @@ pub struct Parser<'a> {
     // count nest loop,
     // break; statement is allowed in loop scope
     n_loop: usize,
+
+    // expr_key generator
+    keygen: ExprKeyGen,
 }
 
 impl<'a> Parser<'a> {
@@ -177,6 +202,7 @@ impl<'a> Parser<'a> {
             peeked: None,
             tokens: scanner,
             n_loop: 0,
+            keygen: ExprKeyGen::new(),
         }
     }
 
@@ -321,7 +347,7 @@ impl<'a> Parser<'a> {
 
         if let Some(t) = self.advance_if_eq(&IDENTIFIER) {
             // move this token into expr
-            return Ok(Expr::new_variable(t));
+            return Ok(Expr::new_variable(self.keygen.next(), t));
         }
 
         if self.advance_if_eq(&LEFT_PAREN).is_some() {
@@ -448,7 +474,7 @@ impl<'a> Parser<'a> {
                 // it is a valid assignment, so we continue to
                 // parse right value recursively.
                 let value = self.assignment()?;
-                return Ok(Expr::new_assign(v.name, value));
+                return Ok(Expr::new_assign(self.keygen.next(), v.name, value));
             } else {
                 return Err(SyntaxError::InvalidAssignTarget(Box::new(
                     equal_tk,

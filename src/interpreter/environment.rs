@@ -84,7 +84,7 @@ impl EnvInner {
 }
 
 impl Environment {
-    pub fn _enclosing_env(&self) -> Option<Environment> {
+    pub fn enclosing_env(&self) -> Option<Environment> {
         self.inner.borrow().enclosing.clone()
     }
 
@@ -104,5 +104,27 @@ impl Environment {
 
     pub fn get(&self, token: &Token) -> RuntimeResult<Value> {
         self.inner.borrow().get(token)
+    }
+
+    fn ancestor(&self, distance: usize) -> Environment {
+        let mut env = self.clone();
+        for _ in 0..distance {
+            // resolver ensure level is valid
+            env = env.enclosing_env().unwrap();
+        }
+        env
+    }
+
+    pub fn get_at(&self, hops: usize, token: &Token) -> RuntimeResult<Value> {
+        self.ancestor(hops).get(token)
+    }
+
+    pub fn assign_at(
+        &self,
+        hops: usize,
+        token: &Token,
+        val: Value,
+    ) -> RuntimeResult<()> {
+        self.ancestor(hops).assign(token, val)
     }
 }

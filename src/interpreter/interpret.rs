@@ -55,14 +55,17 @@ impl Interpret for CallExpr {
 impl Interpret for AssignExpr {
     fn interpret(&self, interpreter: &mut Interpreter) -> RuntimeResult<Value> {
         let val = self.value.interpret(interpreter)?;
-        interpreter.env.assign(&self.name, val.clone())?;
+        // interpreter.env.assign(&self.name, val.clone())?;
+        interpreter.assign_variable(&self.expr_key, &self.name, val.clone())?;
         Ok(val)
     }
 }
 
 impl Interpret for VariableExpr {
     fn interpret(&self, interpreter: &mut Interpreter) -> RuntimeResult<Value> {
-        interpreter.env.get(&self.name)
+        // interpreter.env.get(&self.name)
+        interpreter.lookup_variable(&self.expr_key, &self.name)
+
     }
 }
 

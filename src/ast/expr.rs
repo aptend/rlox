@@ -52,12 +52,16 @@ impl Expr {
         })
     }
 
-    pub fn new_variable(token: Token) -> Expr {
-        Expr::Variable(VariableExpr { name: token })
+    pub fn new_variable(expr_key: u64, token: Token) -> Expr {
+        Expr::Variable(VariableExpr {
+            expr_key,
+            name: token,
+        })
     }
 
-    pub fn new_assign(name: Token, value: Expr) -> Expr {
+    pub fn new_assign(expr_key: u64, name: Token, value: Expr) -> Expr {
         Expr::Assign(AssignExpr {
+            expr_key,
             name,
             value: Box::new(value),
         })
@@ -106,11 +110,15 @@ pub enum Literal {
     Boolean(bool),
 }
 
+// expr_key is used for variable resovling,
+// refer to the comments in Resovler::resolve_local
 pub struct VariableExpr {
+    pub expr_key: u64,
     pub name: Token,
 }
 
 pub struct AssignExpr {
+    pub expr_key: u64,
     pub name: Token,
     pub value: Box<Expr>,
 }

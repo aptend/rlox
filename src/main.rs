@@ -4,6 +4,7 @@ use std::io::{self, BufRead, BufReader, Read, Write};
 
 use rlox::interpreter::Interpreter;
 use rlox::parser::Parser;
+use rlox::resolver::Resolver;
 use rlox::scanner::Scanner;
 
 fn run_prompt() {
@@ -35,18 +36,24 @@ fn run_file(filename: String) {
 fn run(source: &str, interpreter: &mut Interpreter) {
     let scanner = Scanner::new(source);
     let mut parser = Parser::new(scanner);
-    let stmts = parser.parse();
-    match stmts {
-        Ok(stmts) => {
-            if let Err(err) = interpreter.interpret(&stmts) {
-                println!("{}", err);
-            }
-        }
-        Err(errs) => {
+    let stmts = match parser.parse() {
+        Ok(s) => s,
+        Err(ref errs) => {
             for e in errs {
                 println!("{}", e);
             }
+            return;
         }
+    };
+    let mut resolver = Resolver::new(interpreter);
+    if let Err(errs) = resolver.resolve(&stmts) {
+        for e in errs {
+            println!("{}", e);
+        }
+        return;
+    }
+    if let Err(ref e) = interpreter.interpret(&stmts) {
+        println!("{}", e);
     }
 }
 

@@ -118,10 +118,7 @@ pub struct Position {
 
 impl Position {
     pub fn new(line: usize, column: usize) -> Position {
-        Position {
-            line,
-            column,
-        }
+        Position { line, column }
     }
 }
 

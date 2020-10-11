@@ -112,15 +112,13 @@ impl fmt::Debug for Token {
 
 #[derive(Clone, Copy, Eq, PartialEq, Default)]
 pub struct Position {
-    pub offset: usize,
     pub line: usize,
     pub column: usize,
 }
 
 impl Position {
-    pub fn new(offset: usize, line: usize, column: usize) -> Position {
+    pub fn new(line: usize, column: usize) -> Position {
         Position {
-            offset,
             line,
             column,
         }
@@ -161,7 +159,6 @@ impl fmt::Debug for ScanError {
 
 pub struct Scanner<'a> {
     // position
-    offset: usize,
     line: usize,
     column: usize,
 
@@ -178,7 +175,6 @@ pub struct Scanner<'a> {
 impl<'a> Scanner<'a> {
     pub fn new(source: &str) -> Scanner {
         Scanner {
-            offset: 0,
             line: 1,
             column: 1,
             current_lexeme: String::new(),
@@ -264,7 +260,7 @@ impl<'a> Scanner<'a> {
         // stop because of eof
         if self.peek1.is_none() {
             return Err(ScanError {
-                pos: Position::new(self.offset, self.line, self.column),
+                pos: Position::new(self.line, self.column),
                 kind: ErrorKind::UnterminatedString,
             });
         }
@@ -339,7 +335,7 @@ impl<'a> std::iter::Iterator for Scanner<'a> {
     type Item = Result<Token, ScanError>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        let current_pos = Position::new(self.offset, self.line, self.column);
+        let current_pos = Position::new(self.line, self.column);
         self.current_lexeme.clear();
         if let Some(ch) = self.advance() {
             let kind = match ch {

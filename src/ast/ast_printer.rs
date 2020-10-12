@@ -62,7 +62,7 @@ impl AstPrint for AssignExpr {
     fn print_ast(&self) -> String {
         format!(
             "({} <- {})",
-            self.name.string_ref().unwrap(),
+            self.name.as_str().unwrap(),
             self.value.print_ast()
         )
     }
@@ -82,7 +82,7 @@ impl AstPrint for Grouping {
 
 impl AstPrint for VariableExpr {
     fn print_ast(&self) -> String {
-        self.name.string_ref().unwrap().to_owned()
+        self.name.as_str().unwrap().to_owned()
     }
 }
 

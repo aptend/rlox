@@ -81,7 +81,7 @@ impl Token {
         }
     }
 
-    pub fn string_ref(&self) -> Option<&String> {
+    pub fn as_str(&self) -> Option<&String> {
         match &self.kind {
             TokenKind::IDENTIFIER(s) => Some(s),
             TokenKind::STRING(s) => Some(s),

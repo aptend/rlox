@@ -1,0 +1,11 @@
+class DevonshireCream {
+  serveOn() {
+    return "Scones";
+  }
+}
+
+print DevonshireCream; // Prints "DevonshireCream".
+
+var c = DevonshireCream();
+
+print c;  // Prints "DevonshireCream" instance.

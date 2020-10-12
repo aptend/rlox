@@ -50,12 +50,12 @@ impl EnvInner {
     }
 
     pub fn define(&mut self, token: &Token, val: Value) -> RuntimeResult<()> {
-        self.map.insert(token.string_ref().unwrap().clone(), val);
+        self.map.insert(token.as_str().unwrap().clone(), val);
         Ok(())
     }
 
     pub fn assign(&mut self, token: &Token, val: Value) -> RuntimeResult<()> {
-        match self.map.get_mut(token.string_ref().unwrap()) {
+        match self.map.get_mut(token.as_str().unwrap()) {
             Some(v) => {
                 *v = val;
                 Ok(())
@@ -71,7 +71,7 @@ impl EnvInner {
 
     pub fn get(&self, token: &Token) -> RuntimeResult<Value> {
         // only variable expr will call get, it is safe to unwrap
-        match self.map.get(token.string_ref().unwrap()) {
+        match self.map.get(token.as_str().unwrap()) {
             Some(v) => Ok(v.clone()),
             None => match self.enclosing {
                 Some(ref env) => env.get(token),

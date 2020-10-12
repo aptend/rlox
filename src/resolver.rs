@@ -77,7 +77,7 @@ impl<'a> Resolver<'a> {
 
     fn declare(&mut self, name: &'a Token) -> ParseResult<()> {
         if let Some(scope) = self.scopes.last_mut() {
-            let name_str: &str = name.string_ref().unwrap();
+            let name_str: &str = name.as_str().unwrap();
             match scope.entry(name_str) {
                 Entry::Occupied(_) => {
                     return Err(SyntaxError::AlreadyExistVarInScope(Box::new(
@@ -94,7 +94,7 @@ impl<'a> Resolver<'a> {
 
     fn define(&mut self, name: &'a Token) {
         if let Some(scope) = self.scopes.last_mut() {
-            let name_str: &str = name.string_ref().unwrap();
+            let name_str: &str = name.as_str().unwrap();
             scope.insert(name_str, true);
         }
     }
@@ -229,7 +229,7 @@ impl Resolve for Expr {
     {
         match self {
             Expr::Variable(v) => {
-                let name: &str = v.name.string_ref().unwrap();
+                let name: &str = v.name.as_str().unwrap();
                 if let Some(scope) = resolver.scopes.last() {
                     if let Some(false) = scope.get(name) {
                         return Err(SyntaxError::ReadLocalInitializer(
@@ -242,8 +242,7 @@ impl Resolve for Expr {
             }
             Expr::Assign(a) => {
                 a.value.resolve(resolver)?;
-                resolver
-                    .resolve_local(a.expr_key, a.name.string_ref().unwrap());
+                resolver.resolve_local(a.expr_key, a.name.as_str().unwrap());
                 Ok(())
             }
 

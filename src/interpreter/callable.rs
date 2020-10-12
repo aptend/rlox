@@ -5,7 +5,6 @@ use std::rc::Rc;
 use super::{Environment, Interpreter, RuntimeResult, Value};
 
 use super::execute::execute_block_with_env;
-
 use crate::ast::FunctionStmt;
 
 pub trait LoxCallable: fmt::Debug {
@@ -59,8 +58,10 @@ impl fmt::Debug for Callable {
     }
 }
 
+/// --------------------------------------------------------------------------
+/// ----------- NativeClock implementation -----------------------------------
+/// --------------------------------------------------------------------------
 use std::time::{SystemTime, UNIX_EPOCH};
-
 pub struct NativeClock;
 
 impl fmt::Debug for NativeClock {
@@ -83,6 +84,10 @@ impl LoxCallable for NativeClock {
         ))
     }
 }
+
+/// --------------------------------------------------------------------------
+/// ----------- LoxFunction implementation -----------------------------------
+/// --------------------------------------------------------------------------
 
 pub struct LoxFunction {
     func_stmt: FunctionStmt,
@@ -116,36 +121,6 @@ impl LoxCallable for LoxFunction {
 
 impl fmt::Debug for LoxFunction {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "<fn {}>", self.func_stmt.name.string_ref().unwrap())
-    }
-}
-
-pub struct LoxClass {
-    name: String,
-}
-
-impl LoxClass {
-    pub fn new(name: String) -> Self {
-        LoxClass { name }
-    }
-}
-
-impl LoxCallable for LoxClass {
-    fn arity(&self) -> u8 {
-        0
-    }
-
-    fn call(
-        &self,
-        _interpreter: &mut Interpreter,
-        _args: Vec<Value>,
-    ) -> RuntimeResult<Value> {
-        Ok(Value::default())
-    }
-}
-
-impl fmt::Debug for LoxClass {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "<class {}>", self.name)
+        write!(f, "<fn {}>", self.func_stmt.name.as_str().unwrap())
     }
 }

@@ -40,11 +40,7 @@ impl fmt::Display for RuntimeError {
             }
             RuntimeError::UndefinedIdentifier(token) => {
                 write_position(f, token)?;
-                write!(
-                    f,
-                    "Undefined identifier: {}",
-                    token.string_ref().unwrap()
-                )
+                write!(f, "Undefined identifier: {}", token.as_str().unwrap())
             }
             RuntimeError::NonCallable(token) => {
                 write_position(f, token)?;

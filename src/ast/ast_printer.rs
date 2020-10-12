@@ -28,7 +28,18 @@ impl AstPrint for Expr {
             Expr::Assign(v) => v.print_ast(),
             Expr::Logical(v) => v.print_ast(),
             Expr::Call(v) => v.print_ast(),
+            Expr::Get(v) => v.print_ast(),
         }
+    }
+}
+
+impl AstPrint for GetExpr {
+    fn print_ast(&self) -> String {
+        format!(
+            "{}.{}",
+            self.object.print_ast(),
+            self.name.as_str().unwrap()
+        )
     }
 }
 

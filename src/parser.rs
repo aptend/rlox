@@ -68,6 +68,7 @@ pub enum SynCxt {
     MethodDecl,
     ClassDecl,
     ReturnStmt,
+    GetExpr,
 }
 
 impl fmt::Display for SynCxt {
@@ -78,6 +79,7 @@ impl fmt::Display for SynCxt {
             SynCxt::MethodDecl => write!(f, "method declaration"),
             SynCxt::ClassDecl => write!(f, "class declaration"),
             SynCxt::ReturnStmt => write!(f, "return statement"),
+            SynCxt::GetExpr => write!(f, "dot syntax"),
         }
     }
 }
@@ -373,6 +375,10 @@ impl<'a> Parser<'a> {
         loop {
             if self.advance_if_eq(&LEFT_PAREN).is_some() {
                 callee = self.finish_call(callee)?;
+            } else if self.advance_if_eq(&DOT).is_some() {
+                let name =
+                    self.consume_or_err(&IDENTIFIER, Some(SynCxt::GetExpr))?;
+                callee = Expr::new_get(callee, name);
             } else {
                 break;
             }

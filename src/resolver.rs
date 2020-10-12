@@ -245,6 +245,7 @@ impl Resolve for Expr {
                 resolver.resolve_local(a.expr_key, a.name.as_str().unwrap());
                 Ok(())
             }
+            Expr::Get(g) => g.object.resolve(resolver),
 
             // the following match arms exist to lead us in the maze of
             // syntax tree

@@ -20,7 +20,19 @@ impl Interpret for Expr {
             Expr::Assign(a) => a.interpret(interpreter),
             Expr::Logical(l) => l.interpret(interpreter),
             Expr::Call(c) => c.interpret(interpreter),
+            Expr::Get(g) => g.interpret(interpreter),
         }
+    }
+}
+
+impl Interpret for GetExpr {
+    fn interpret(&self, interpreter: &mut Interpreter) -> RuntimeResult<Value> {
+        if let Value::Instance(inst) = self.object.interpret(interpreter)? {
+        } else {
+        }
+        use crate::ast::AstPrint;
+        println!("{}", self.print_ast());
+        Ok(Value::default())
     }
 }
 

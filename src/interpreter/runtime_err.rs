@@ -10,6 +10,7 @@ pub enum RuntimeError {
     BinaryMismatchedType(BoxToken),
     UndefinedIdentifier(BoxToken),
     NonCallable(BoxToken),
+    NonInstanceGet(BoxToken),
     // maxium argmument counts is 255, u8 is enough.
     ArityMismatch(BoxToken, u8, u8),
 
@@ -45,6 +46,10 @@ impl fmt::Display for RuntimeError {
             RuntimeError::NonCallable(token) => {
                 write_position(f, token)?;
                 write!(f, "Can only call functions and classes")
+            }
+            RuntimeError::NonInstanceGet(token) => {
+                write_position(f, token)?;
+                write!(f, "Only instances have properties.")
             }
             RuntimeError::ArityMismatch(token, expect, got) => {
                 write_position(f, token)?;

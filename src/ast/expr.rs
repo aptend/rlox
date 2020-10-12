@@ -8,6 +8,7 @@ pub enum Expr {
     Variable(VariableExpr),
     Assign(AssignExpr),
     Call(CallExpr),
+    Get(GetExpr),
 }
 
 impl Expr {
@@ -74,6 +75,13 @@ impl Expr {
             arguments,
         })
     }
+
+    pub fn new_get(object: Expr, name: Token) -> Expr {
+        Expr::Get(GetExpr {
+            object: Box::new(object),
+            name,
+        })
+    }
 }
 
 impl std::default::Default for Expr {
@@ -127,4 +135,9 @@ pub struct CallExpr {
     pub callee: Box<Expr>,
     pub pos_tk: Token,
     pub arguments: Vec<Expr>,
+}
+
+pub struct GetExpr {
+    pub object: Box<Expr>,
+    pub name: Token,
 }

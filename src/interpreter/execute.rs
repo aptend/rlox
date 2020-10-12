@@ -71,7 +71,7 @@ impl Execute for ClassStmt {
 
 // setup new env, execute block, restore old env after executing, anyway.
 // use this because executing plain block and executing function body block
-// require different environment.
+// require different environments.
 pub fn execute_block_with_env(
     block: &BlockStmt,
     interpreter: &mut Interpreter,

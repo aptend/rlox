@@ -6,7 +6,7 @@ use super::{Environment, Interpreter, RuntimeResult, Value};
 
 use super::execute::execute_block_with_env;
 
-use crate::ast::{FunctionStmt, Stmt};
+use crate::ast::FunctionStmt;
 
 pub trait LoxCallable: fmt::Debug {
     fn arity(&self) -> u8;
@@ -109,9 +109,7 @@ impl LoxCallable for LoxFunction {
         for (param, arg) in self.func_stmt.params.iter().zip(args) {
             local_env.define(param, arg)?;
         }
-        if let Stmt::Block(block) = &*self.func_stmt.body {
-            execute_block_with_env(block, interpreter, local_env)?;
-        }
+        execute_block_with_env(&self.func_stmt.body, interpreter, local_env)?;
         Ok(Value::default())
     }
 }

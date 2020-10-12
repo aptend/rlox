@@ -66,6 +66,7 @@ pub enum SynCxt {
     VarDecl,
     FunDecl,
     MethodDecl,
+    ClassDecl,
     ReturnStmt,
 }
 
@@ -75,6 +76,7 @@ impl fmt::Display for SynCxt {
             SynCxt::VarDecl => write!(f, "variable declaration"),
             SynCxt::FunDecl => write!(f, "function declaration"),
             SynCxt::MethodDecl => write!(f, "method declaration"),
+            SynCxt::ClassDecl => write!(f, "class declaration"),
             SynCxt::ReturnStmt => write!(f, "return statement"),
         }
     }
@@ -639,19 +641,14 @@ impl<'a> Parser<'a> {
     }
 
     fn var_decl_stmt(&mut self) -> ParseResult<Stmt> {
-        if let Some(token) = self.advance_if_eq(&IDENTIFIER) {
-            let mut init = Expr::default();
-            if self.advance_if_eq(&EQUAL).is_some() {
-                init = self.expression()?;
-            }
-            self.consume_or_err(&SEMICOLON, None)?;
-            Ok(Stmt::new_variable(token, init))
+        let name = self.consume_or_err(&IDENTIFIER, Some(SynCxt::VarDecl))?;
+        let init = if self.advance_if_eq(&EQUAL).is_some() {
+            self.expression()?
         } else {
-            Err(SyntaxError::ExpectIdentifier(
-                self.box_current_token(),
-                SynCxt::VarDecl,
-            ))
-        }
+            Expr::default()
+        };
+        self.consume_or_err(&SEMICOLON, None)?;
+        Ok(Stmt::new_variable(name, init))
     }
 
     fn fun_decl_stmt(&mut self, cxt: Option<SynCxt>) -> ParseResult<Stmt> {
@@ -674,8 +671,37 @@ impl<'a> Parser<'a> {
         }
         self.consume_or_err(&RIGHT_PAREN, None)?;
         self.consume_or_err(&LEFT_BRACE, None)?;
-        let body = self.block_stmt()?;
+        let body = match self.block_stmt()? {
+            Stmt::Block(body) => body,
+            _ => unreachable!(),
+        };
         Ok(Stmt::new_function(name, params, body))
+    }
+
+    fn class_decl_stmt(&mut self) -> ParseResult<Stmt> {
+        let cxt = Some(SynCxt::ClassDecl);
+        let name = self.consume_or_err(&IDENTIFIER, cxt)?;
+        self.consume_or_err(&LEFT_BRACE, cxt)?;
+
+        let mut methods = Vec::new();
+        while self.peek_check(|tk| tk != &*RIGHT_BRACE) {
+            methods.push(self.fun_decl_stmt(Some(SynCxt::MethodDecl))?);
+        }
+
+        self.consume_or_err(&RIGHT_BRACE, cxt)?;
+
+        let methods: Vec<_> = methods
+            .into_iter()
+            .flat_map(|s| {
+                if let Stmt::Function(f) = s {
+                    Some(f)
+                } else {
+                    None
+                }
+            })
+            .collect();
+
+        Ok(Stmt::new_class(name, methods))
     }
 
     fn declaration(&mut self) -> ParseResult<Stmt> {
@@ -684,6 +710,9 @@ impl<'a> Parser<'a> {
         }
         if self.advance_if_eq(&FUN).is_some() {
             return self.fun_decl_stmt(Some(SynCxt::FunDecl));
+        }
+        if self.advance_if_eq(&CLASS).is_some() {
+            return self.class_decl_stmt();
         }
         self.statement()
     }

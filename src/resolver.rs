@@ -130,13 +130,8 @@ impl<'a> Resolver<'a> {
             self.define(param);
         }
         // resolve body manually, avoiding begin_scope again.
-        // a bit messy
-        if let Stmt::Block(body) = &*stmt.body {
-            for b in &body.stmts {
-                b.resolve(self)?;
-            }
-        } else {
-            panic!("function body is not Stmt::Block");
+        for b in &stmt.body.stmts {
+            b.resolve(self)?;
         }
         self.end_scope();
         self.current_function = enclosing_function;

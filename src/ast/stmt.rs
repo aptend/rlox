@@ -60,7 +60,11 @@ impl Stmt {
         Stmt::Return(ReturnStmt { ret_tk, value })
     }
 
-    pub fn new_function(name: Token, params: Vec<Token>, body: Stmt) -> Stmt {
+    pub fn new_function(
+        name: Token,
+        params: Vec<Token>,
+        body: BlockStmt,
+    ) -> Stmt {
         Stmt::Function(FunctionStmt {
             inner: Rc::new(FuncInner {
                 name,
@@ -70,17 +74,7 @@ impl Stmt {
         })
     }
 
-    pub fn new_class(name: Token, methods: Vec<Stmt>) -> Stmt {
-        let methods: Vec<FunctionStmt> = methods
-            .into_iter()
-            .flat_map(|s| {
-                if let Stmt::Function(f) = s {
-                    Some(f)
-                } else {
-                    None
-                }
-            })
-            .collect();
+    pub fn new_class(name: Token, methods: Vec<FunctionStmt>) -> Stmt {
         Stmt::Class(ClassStmt { name, methods })
     }
 }
@@ -132,9 +126,8 @@ impl Deref for FunctionStmt {
 pub struct FuncInner {
     pub name: Token,
     pub params: Vec<Token>,
-    // TODO body: Vec<Stmt>
-    // distinguish it from Block because they have different running environment
-    pub body: Box<Stmt>,
+    // represent body by Stmt::Block,
+    pub body: Box<BlockStmt>,
 }
 
 pub struct ClassStmt {

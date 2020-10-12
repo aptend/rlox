@@ -1,6 +1,5 @@
 use std::cell::RefCell;
 use std::fmt;
-use std::ops::Deref;
 use std::rc::Rc;
 
 use super::{Environment, Interpreter, RuntimeResult, Value};
@@ -110,7 +109,7 @@ impl LoxCallable for LoxFunction {
         for (param, arg) in self.func_stmt.params.iter().zip(args) {
             local_env.define(param, arg)?;
         }
-        if let Stmt::Block(block) = self.func_stmt.body.deref() {
+        if let Stmt::Block(block) = &*self.func_stmt.body {
             execute_block_with_env(block, interpreter, local_env)?;
         }
         Ok(Value::default())
@@ -120,5 +119,35 @@ impl LoxCallable for LoxFunction {
 impl fmt::Debug for LoxFunction {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "<fn {}>", self.func_stmt.name.string_ref().unwrap())
+    }
+}
+
+pub struct LoxClass {
+    name: String,
+}
+
+impl LoxClass {
+    pub fn new(name: String) -> Self {
+        LoxClass { name }
+    }
+}
+
+impl LoxCallable for LoxClass {
+    fn arity(&self) -> u8 {
+        0
+    }
+
+    fn call(
+        &self,
+        _interpreter: &mut Interpreter,
+        _args: Vec<Value>,
+    ) -> RuntimeResult<Value> {
+        Ok(Value::default())
+    }
+}
+
+impl fmt::Debug for LoxClass {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "<class {}>", self.name)
     }
 }

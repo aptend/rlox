@@ -193,6 +193,12 @@ impl Resolve for Stmt {
                 resolver.resolve_function(f)
             }
 
+            Stmt::Class(c) => {
+                resolver.declare(&c.name)?;
+                resolver.define(&c.name);
+                Ok(())
+            }
+
             // the following match arms exist to lead us in the maze of
             // syntax tree
             Stmt::Print(p) => p.resolve(resolver),

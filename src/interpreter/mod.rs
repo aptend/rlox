@@ -5,7 +5,7 @@ mod interpret;
 mod runtime_err;
 mod value;
 
-use callable::{Callable, LoxCallable, LoxFunction, NativeClock};
+use callable::{Callable, LoxCallable, LoxClass, LoxFunction, NativeClock};
 use environment::Environment;
 use execute::Execute;
 use interpret::Interpret;

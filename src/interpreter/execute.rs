@@ -1,5 +1,5 @@
 use super::Interpret;
-use super::{Environment, Interpreter, LoxFunction, Value};
+use super::{Environment, Interpreter, LoxClass, LoxFunction, Value};
 use super::{RuntimeError, RuntimeResult};
 use crate::ast::stmt::*;
 
@@ -29,6 +29,7 @@ impl Execute for Stmt {
             Stmt::If(i) => i.execute(interpreter),
             Stmt::While(w) => w.execute(interpreter),
             Stmt::Function(f) => f.execute(interpreter),
+            Stmt::Class(c) => c.execute(interpreter),
             Stmt::Break => Err(RuntimeError::BreakControl),
             Stmt::Return(r) => r.execute(interpreter),
         }
@@ -54,7 +55,23 @@ impl Execute for FunctionStmt {
     }
 }
 
+impl Execute for ClassStmt {
+    fn execute(&self, interpreter: &mut Interpreter) -> RuntimeResult<()> {
+        // two-stage variable binding process allows
+        // references to the class inside its own methods.
+        interpreter.env.define(&self.name, Value::default())?;
+        let lox_class =
+            Box::new(LoxClass::new(self.name.string_ref().unwrap().clone()));
+        interpreter
+            .env
+            .assign(&self.name, Value::new_callable(lox_class))?;
+        Ok(())
+    }
+}
+
 // setup new env, execute block, restore old env after executing, anyway.
+// use this because executing plain block and executing function body block
+// require different environment.
 pub fn execute_block_with_env(
     block: &BlockStmt,
     interpreter: &mut Interpreter,

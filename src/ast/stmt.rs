@@ -11,6 +11,7 @@ pub enum Stmt {
     While(WhileStmt),
     Function(FunctionStmt),
     Return(ReturnStmt),
+    Class(ClassStmt),
     Break,
 }
 
@@ -68,6 +69,20 @@ impl Stmt {
             }),
         })
     }
+
+    pub fn new_class(name: Token, methods: Vec<Stmt>) -> Stmt {
+        let methods: Vec<FunctionStmt> = methods
+            .into_iter()
+            .flat_map(|s| {
+                if let Stmt::Function(f) = s {
+                    Some(f)
+                } else {
+                    None
+                }
+            })
+            .collect();
+        Stmt::Class(ClassStmt { name, methods })
+    }
 }
 
 pub struct VariableStmt {
@@ -117,5 +132,12 @@ impl Deref for FunctionStmt {
 pub struct FuncInner {
     pub name: Token,
     pub params: Vec<Token>,
+    // TODO body: Vec<Stmt>
+    // distinguish it from Block because they have different running environment
     pub body: Box<Stmt>,
+}
+
+pub struct ClassStmt {
+    pub name: Token,
+    pub methods: Vec<FunctionStmt>,
 }

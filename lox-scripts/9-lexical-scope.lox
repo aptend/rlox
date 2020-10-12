@@ -1,10 +1,14 @@
+// scopes_info: {"showA-1": 0, "showA-2": 0, "local-a": 0}
+
 var a = "global";
 {
   fun showA() {
-    print a;
+    print a;  // not in resolution info, find variable 'a' in global env
+    return 42;
   }
 
-  showA();  // "global"
+  showA();  // "global" expr_key = showA-1
   var a = "block";
-  showA();  // "global"
+  showA();  // "global" expr_key = showA-2
+  print a;  // "block"  expr_key = local-a hops = 0, find variable 'a' in local env
 }

@@ -90,10 +90,13 @@ pub enum SyntaxError {
     ExpectSemicolon(BoxToken),
     ExpectIdentifier(BoxToken, SynCxt),
     InvalidAssignTarget(BoxToken),
-    BreakOutside(BoxToken),
     TooManyArguments(BoxToken),
+    BreakOutside(BoxToken),
+    // raise by resovler
+    ReturnOutside(BoxToken),
     ReadLocalInitializer(BoxToken),
     AlreadyExistVarInScope(BoxToken),
+    // raise by scanner
     LexError(ScanError),
 }
 
@@ -167,6 +170,10 @@ impl fmt::Display for SyntaxError {
             SyntaxError::AlreadyExistVarInScope(t) => {
                 write_position(f, t)?;
                 write!(f, "Already variable with this name in this scope.")
+            }
+            SyntaxError::ReturnOutside(t) => {
+                write_position(f, t)?;
+                write!(f, "Can't return from top-level code.")
             }
         }
     }

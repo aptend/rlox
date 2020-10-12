@@ -65,7 +65,6 @@ impl Interpret for VariableExpr {
     fn interpret(&self, interpreter: &mut Interpreter) -> RuntimeResult<Value> {
         // interpreter.env.get(&self.name)
         interpreter.lookup_variable(&self.expr_key, &self.name)
-
     }
 }
 

@@ -7,6 +7,12 @@ use std::collections::hash_map::{Entry, HashMap};
 
 type ParseResult<T> = Result<T, SyntaxError>;
 
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+enum FunctionType {
+    None,
+    Function,
+}
+
 // Let me try lifetime approach for Resolver
 
 // Resolver.scopes' Key is refer to the built syntax tree(Vec<Stmt>)
@@ -23,6 +29,8 @@ type ParseResult<T> = Result<T, SyntaxError>;
 pub struct Resolver<'a> {
     scopes: Vec<HashMap<&'a str, bool>>,
     interpreter: &'a mut Interpreter,
+    current_function: FunctionType,
+    // Could have moved BreakOutside here. It is trival
 }
 
 impl<'a> Resolver<'a> {
@@ -30,6 +38,7 @@ impl<'a> Resolver<'a> {
         Resolver {
             scopes: Vec::new(),
             interpreter,
+            current_function: FunctionType::None,
         }
     }
 
@@ -113,12 +122,15 @@ impl<'a> Resolver<'a> {
     }
 
     fn resolve_function(&mut self, stmt: &'a FunctionStmt) -> ParseResult<()> {
+        let enclosing_function = self.current_function;
+        self.current_function = FunctionType::Function;
         self.begin_scope();
         for param in &stmt.params {
             self.declare(param)?;
             self.define(param);
         }
         // resolve body manually, avoiding begin_scope again.
+        // a bit messy
         if let Stmt::Block(body) = &*stmt.body {
             for b in &body.stmts {
                 b.resolve(self)?;
@@ -127,6 +139,7 @@ impl<'a> Resolver<'a> {
             panic!("function body is not Stmt::Block");
         }
         self.end_scope();
+        self.current_function = enclosing_function;
         Ok(())
     }
 }
@@ -184,7 +197,13 @@ impl Resolve for Stmt {
             // syntax tree
             Stmt::Print(p) => p.resolve(resolver),
             Stmt::Expression(e) => e.resolve(resolver),
-            Stmt::Return(r) => r.value.resolve(resolver),
+            Stmt::Return(r) => {
+                if resolver.current_function == FunctionType::None {
+                    Err(SyntaxError::ReturnOutside(Box::new(r.ret_tk.clone())))
+                } else {
+                    r.value.resolve(resolver)
+                }
+            }
             Stmt::While(w) => {
                 w.cond.resolve(resolver)?;
                 w.body.resolve(resolver)

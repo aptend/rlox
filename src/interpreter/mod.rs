@@ -47,7 +47,6 @@ impl Interpreter {
     }
 
     pub fn interpret(&mut self, stmts: &[Stmt]) -> RuntimeResult<()> {
-        println!("{:?}", self.scopes_info);
         for stmt in stmts {
             stmt.execute(self)?;
         }

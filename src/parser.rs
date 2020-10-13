@@ -98,6 +98,7 @@ pub enum SyntaxError {
     BreakOutside(BoxToken),
     // raise by resovler
     ReturnOutside(BoxToken),
+    ThisOutside(BoxToken),
     ReadLocalInitializer(BoxToken),
     AlreadyExistVarInScope(BoxToken),
     // raise by scanner
@@ -178,6 +179,10 @@ impl fmt::Display for SyntaxError {
             SyntaxError::ReturnOutside(t) => {
                 write_position(f, t)?;
                 write!(f, "Can't return from top-level code.")
+            }
+            SyntaxError::ThisOutside(t) => {
+                write_position(f, t)?;
+                write!(f, "Can't use 'this' outside of a class.")
             }
         }
     }

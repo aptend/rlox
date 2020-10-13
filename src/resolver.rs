@@ -14,6 +14,12 @@ enum FunctionType {
     Method,
 }
 
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+enum ClassType {
+    None,
+    Class,
+}
+
 // Let me try lifetime approach for Resolver
 
 // Resolver.scopes' Key is refer to the built syntax tree(Vec<Stmt>)
@@ -31,6 +37,7 @@ pub struct Resolver<'a> {
     scopes: Vec<HashMap<&'a str, bool>>,
     interpreter: &'a mut Interpreter,
     current_function: FunctionType,
+    current_class: ClassType,
     // Could have moved BreakOutside here. It is trival
 }
 
@@ -40,6 +47,7 @@ impl<'a> Resolver<'a> {
             scopes: Vec::new(),
             interpreter,
             current_function: FunctionType::None,
+            current_class: ClassType::None,
         }
     }
 
@@ -201,6 +209,8 @@ impl Resolve for Stmt {
             }
 
             Stmt::Class(c) => {
+                let current_class = resolver.current_class;
+                resolver.current_class = ClassType::Class;
                 resolver.declare(&c.name)?;
                 resolver.define(&c.name);
                 // mock the bound environment first
@@ -208,9 +218,12 @@ impl Resolve for Stmt {
                 resolver.define_str("this");
                 let fun_type = FunctionType::Method;
                 for fun_stmt in &c.methods {
+                    // no need to declare methods' names
+                    // they are stored in LoxClass instead of environment
                     resolver.resolve_function(fun_stmt, fun_type)?;
                 }
                 resolver.end_scope();
+                resolver.current_class = current_class;
                 Ok(())
             }
 
@@ -267,8 +280,12 @@ impl Resolve for Expr {
             }
 
             Expr::This(t) => {
-                resolver.resolve_local(t.expr_key, "this");
-                Ok(())
+                if resolver.current_class == ClassType::None {
+                    Err(SyntaxError::ThisOutside(Box::new(t.this_tk.clone())))
+                } else {
+                    resolver.resolve_local(t.expr_key, "this");
+                    Ok(())
+                }
             }
 
             // the following match arms exist to lead us in the maze of

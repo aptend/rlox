@@ -33,6 +33,7 @@ impl LoxClass {
             .map(|m| {
                 (
                     m.name.as_str().unwrap().to_owned(),
+                    // check init name here
                     LoxFunction::new(m.clone(), env.clone()),
                 )
             })
@@ -42,19 +43,31 @@ impl LoxClass {
             inner: Rc::new(ClassInner { name, methods }),
         }
     }
+
+    fn find_method(&self, name: &str) -> Option<&LoxFunction> {
+        self.methods.get(name)
+    }
 }
 
 impl LoxCallable for LoxClass {
     fn arity(&self) -> u8 {
-        0
+        if let Some(initializer) = self.find_method("init") {
+            initializer.arity()
+        } else {
+            0
+        }
     }
 
     fn call(
         &self,
-        _interpreter: &mut Interpreter,
-        _args: Vec<Value>,
+        interpreter: &mut Interpreter,
+        args: Vec<Value>,
     ) -> RuntimeResult<Value> {
-        Ok(Value::Instance(LoxInstance::new(self.clone())))
+        let instance = LoxInstance::new(self.clone());
+        if let Some(initializer) = self.find_method("init") {
+            initializer.bind(instance.clone()).call(interpreter, args)?;
+        }
+        Ok(Value::Instance(instance))
     }
 }
 
@@ -84,13 +97,10 @@ impl LoxInstance {
         }
     }
 
-    fn find_method(&self, name: &str) -> Option<Value> {
-        self.inner
-            .borrow()
-            .class
-            .methods
-            .get(name)
-            .map(|func| Value::new_callable(Box::new(func.bind(self.clone()))))
+    fn find_bound_method(&self, name: &str) -> Option<Box<dyn LoxCallable>> {
+        self.inner.borrow().class.find_method(name).map(|func| {
+            Box::new(func.bind(self.clone())) as Box<dyn LoxCallable>
+        })
     }
 
     pub fn get(&self, name: &str) -> Option<Value> {
@@ -99,7 +109,7 @@ impl LoxInstance {
             .fields
             .get(name)
             .cloned()
-            .or_else(|| self.find_method(name))
+            .or_else(|| self.find_bound_method(name).map(Value::new_callable))
     }
 
     pub fn set(&self, name: &str, value: Value) {

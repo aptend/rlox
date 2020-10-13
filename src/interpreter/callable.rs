@@ -3,8 +3,8 @@ use std::fmt;
 use std::rc::Rc;
 
 use super::{
-    Environment, Interpreter, LoxInstance, RuntimeResult, Token, TokenKind,
-    Value,
+    Environment, Interpreter, LoxInstance, RuntimeError, RuntimeResult, Token,
+    TokenKind, Value,
 };
 
 use super::execute::execute_block_with_env;
@@ -90,13 +90,14 @@ impl LoxCallable for NativeClock {
 
 #[derive(Clone)]
 pub struct LoxFunction {
+    is_initializer: bool,
     pub func_stmt: FunctionStmt,
     pub closure: Environment,
 }
 
 impl LoxFunction {
-    pub fn new(func_stmt: FunctionStmt, closure: Environment) -> Self {
-        LoxFunction { func_stmt, closure }
+    pub fn new(func_stmt: FunctionStmt, closure: Environment, is_initializer: bool) -> Self {
+        LoxFunction { func_stmt, closure, is_initializer }
     }
 
     pub fn bind(&self, inst: LoxInstance) -> Self {
@@ -107,6 +108,7 @@ impl LoxFunction {
         LoxFunction {
             func_stmt: self.func_stmt.clone(),
             closure: bound_env,
+            is_initializer: self.is_initializer,
         }
     }
 }
@@ -125,8 +127,20 @@ impl LoxCallable for LoxFunction {
         for (param, arg) in self.func_stmt.params.iter().zip(args) {
             local_env.define(param, arg)?;
         }
-        execute_block_with_env(&self.func_stmt.body, interpreter, local_env)?;
-        Ok(Value::default())
+        match execute_block_with_env(
+            &self.func_stmt.body,
+            interpreter,
+            local_env,
+        ).and(Ok(Value::default())) {
+            Err(RuntimeError::ReturnControl(v)) | Ok(v) => {
+                if self.is_initializer {
+                    Ok(self.closure.get_at(0, "init").unwrap())
+                } else {
+                    Ok(v)
+                }
+            }
+            Err(e) => Err(e),
+        }
     }
 }
 

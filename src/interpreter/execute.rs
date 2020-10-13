@@ -46,7 +46,7 @@ impl Execute for ReturnStmt {
 impl Execute for FunctionStmt {
     fn execute(&self, interpreter: &mut Interpreter) -> RuntimeResult<()> {
         let lox_function =
-            Box::new(LoxFunction::new(self.clone(), interpreter.env.clone()));
+            Box::new(LoxFunction::new(self.clone(), interpreter.env.clone(), false));
 
         interpreter
             .env

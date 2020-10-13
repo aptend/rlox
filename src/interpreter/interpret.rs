@@ -74,10 +74,7 @@ impl Interpret for CallExpr {
             for arg in &self.arguments {
                 args.push(arg.interpret(interpreter)?);
             }
-            match callee.call(interpreter, args) {
-                Err(RuntimeError::ReturnControl(v)) | Ok(v) => Ok(v),
-                Err(e) => Err(e),
-            }
+            callee.call(interpreter, args)
         } else {
             Err(RuntimeError::NonCallable(Box::new(self.pos_tk.clone())))
         }

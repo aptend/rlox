@@ -101,7 +101,7 @@ pub enum SyntaxError {
     ReturnValueInInit(BoxToken),
     ThisOutside(BoxToken),
     ReadLocalInitializer(BoxToken),
-    AlreadyExistVarInScope(BoxToken),
+    AlreadyExistInScope(BoxToken),
     // raise by scanner
     LexError(ScanError),
 }
@@ -173,9 +173,12 @@ impl fmt::Display for SyntaxError {
                 write_position(f, t)?;
                 write!(f, "Can't read local variable in its own initializer.")
             }
-            SyntaxError::AlreadyExistVarInScope(t) => {
+            SyntaxError::AlreadyExistInScope(t) => {
                 write_position(f, t)?;
-                write!(f, "Already variable with this name in this scope.")
+                write!(
+                    f,
+                    "Already variable/function with this name in this scope."
+                )
             }
             SyntaxError::ReturnOutside(t) => {
                 write_position(f, t)?;

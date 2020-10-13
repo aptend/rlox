@@ -20,3 +20,15 @@ class Baz {
     return 12;
   }
 }
+
+
+class FooBar {
+  dup() {}
+  dup() {
+    dup();
+  }
+}
+
+fun dup() {
+  print "global dup function";
+}

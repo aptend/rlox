@@ -62,5 +62,5 @@ fn main() {
         Some(file) => run_file(file),
         None => run_prompt(),
     }
-    println!("Bye Bye!");
+    println!("⭐ Bye Bye!⭐");
 }

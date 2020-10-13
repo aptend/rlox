@@ -37,6 +37,7 @@ enum ClassType {
 // and the built syntax, there is nothing to do with &mut Interpreter, so
 // only one lifetime mark is used and compiler handles all the left.
 pub struct Resolver<'a> {
+    errors: Vec<SyntaxError>,
     scopes: Vec<HashMap<&'a str, bool>>,
     interpreter: &'a mut Interpreter,
     current_function: FunctionType,
@@ -47,6 +48,7 @@ pub struct Resolver<'a> {
 impl<'a> Resolver<'a> {
     pub fn new(interpreter: &'a mut Interpreter) -> Self {
         Resolver {
+            errors: Vec::new(),
             scopes: Vec::new(),
             interpreter,
             current_function: FunctionType::None,
@@ -64,17 +66,16 @@ impl<'a> Resolver<'a> {
     where
         's: 'a,
     {
-        let mut errors = Vec::new();
         for stmt in stmts {
             if let Err(e) = stmt.resolve(self) {
-                errors.push(e);
+                self.errors.push(e);
             }
         }
 
-        if errors.is_empty() {
+        if self.errors.is_empty() {
             Ok(())
         } else {
-            Err(errors)
+            Err(std::mem::take(&mut self.errors))
         }
     }
 
@@ -95,9 +96,9 @@ impl<'a> Resolver<'a> {
             let name_str: &str = name.as_str().unwrap();
             match scope.entry(name_str) {
                 Entry::Occupied(_) => {
-                    return Err(SyntaxError::AlreadyExistVarInScope(Box::new(
-                        name.clone(),
-                    )))
+                    self.errors.push(SyntaxError::AlreadyExistInScope(
+                        Box::new(name.clone()),
+                    ));
                 }
                 Entry::Vacant(e) => {
                     e.insert(false);
@@ -264,11 +265,17 @@ impl Resolve for Stmt {
             Stmt::Expression(e) => e.resolve(resolver),
             Stmt::Return(r) => match resolver.current_function {
                 FunctionType::None => {
-                    Err(SyntaxError::ReturnOutside(Box::new(r.ret_tk.clone())))
+                    resolver.errors.push(SyntaxError::ReturnOutside(Box::new(
+                        r.ret_tk.clone(),
+                    )));
+                    Ok(())
                 }
-                FunctionType::Initializer if Expr::is_nil(&r.value) => Err(
-                    SyntaxError::ReturnValueInInit(Box::new(r.ret_tk.clone())),
-                ),
+                FunctionType::Initializer if Expr::is_nil(&r.value) => {
+                    resolver.errors.push(SyntaxError::ReturnValueInInit(
+                        Box::new(r.ret_tk.clone()),
+                    ));
+                    Ok(())
+                }
                 _ => r.value.resolve(resolver),
             },
             Stmt::While(w) => {
@@ -298,9 +305,12 @@ impl Resolve for Expr {
                 let name: &str = v.name.as_str().unwrap();
                 if let Some(scope) = resolver.scopes.last() {
                     if let Some(false) = scope.get(name) {
-                        return Err(SyntaxError::ReadLocalInitializer(
-                            Box::new(v.name.clone()),
-                        ));
+                        resolver.errors.push(
+                            SyntaxError::ReadLocalInitializer(Box::new(
+                                v.name.clone(),
+                            )),
+                        );
+                        return Ok(());
                     }
                 }
                 resolver.resolve_local(v.expr_key, name);
@@ -314,11 +324,13 @@ impl Resolve for Expr {
 
             Expr::This(t) => {
                 if resolver.current_class == ClassType::None {
-                    Err(SyntaxError::ThisOutside(Box::new(t.this_tk.clone())))
+                    resolver.errors.push(SyntaxError::ThisOutside(Box::new(
+                        t.this_tk.clone(),
+                    )));
                 } else {
                     resolver.resolve_local(t.expr_key, "this");
-                    Ok(())
                 }
+                Ok(())
             }
 
             // the following match arms exist to lead us in the maze of

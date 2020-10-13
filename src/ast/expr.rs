@@ -9,6 +9,7 @@ pub enum Expr {
     Assign(AssignExpr),
     Call(CallExpr),
     Get(GetExpr),
+    Set(SetExpr),
 }
 
 impl Expr {
@@ -82,6 +83,14 @@ impl Expr {
             name,
         })
     }
+
+    pub fn new_set(object: Expr, name: Token, value: Expr) -> Expr {
+        Expr::Set(SetExpr {
+            object: Box::new(object),
+            name,
+            value: Box::new(value),
+        })
+    }
 }
 
 impl std::default::Default for Expr {
@@ -140,4 +149,10 @@ pub struct CallExpr {
 pub struct GetExpr {
     pub object: Box<Expr>,
     pub name: Token,
+}
+
+pub struct SetExpr {
+    pub object: Box<Expr>,
+    pub name: Token,
+    pub value: Box<Expr>,
 }

@@ -246,6 +246,10 @@ impl Resolve for Expr {
                 Ok(())
             }
             Expr::Get(g) => g.object.resolve(resolver),
+            Expr::Set(s) => {
+                s.object.resolve(resolver)?;
+                s.value.resolve(resolver)
+            }
 
             // the following match arms exist to lead us in the maze of
             // syntax tree

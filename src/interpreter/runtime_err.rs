@@ -9,6 +9,7 @@ pub enum RuntimeError {
     UnaryMismatchedType(BoxToken),
     BinaryMismatchedType(BoxToken),
     UndefinedIdentifier(BoxToken),
+    UndefinedProperty(BoxToken),
     NonCallable(BoxToken),
     NonInstanceGet(BoxToken),
     // maxium argmument counts is 255, u8 is enough.
@@ -41,7 +42,11 @@ impl fmt::Display for RuntimeError {
             }
             RuntimeError::UndefinedIdentifier(token) => {
                 write_position(f, token)?;
-                write!(f, "Undefined identifier: {}", token.as_str().unwrap())
+                write!(f, "Undefined identifier: {:?}", token.as_str().unwrap())
+            }
+            RuntimeError::UndefinedProperty(token) => {
+                write_position(f, token)?;
+                write!(f, "Undefined property: {:?}", token.as_str().unwrap())
             }
             RuntimeError::NonCallable(token) => {
                 write_position(f, token)?;

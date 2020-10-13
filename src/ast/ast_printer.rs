@@ -29,7 +29,19 @@ impl AstPrint for Expr {
             Expr::Logical(v) => v.print_ast(),
             Expr::Call(v) => v.print_ast(),
             Expr::Get(v) => v.print_ast(),
+            Expr::Set(v) => v.print_ast(),
         }
+    }
+}
+
+impl AstPrint for SetExpr {
+    fn print_ast(&self) -> String {
+        format!(
+            "({}.{} <- {})",
+            self.object.print_ast(),
+            self.name.as_str().unwrap(),
+            self.value.print_ast()
+        )
     }
 }
 

@@ -56,6 +56,17 @@ impl LoxInstance {
             })),
         }
     }
+
+    pub fn get(&self, name: &str) -> Option<Value> {
+        self.inner.borrow().fields.get(name).map(Clone::clone)
+    }
+
+    pub fn set(&self, name: &str, value: Value) {
+        self.inner
+            .borrow_mut()
+            .fields
+            .insert(name.to_owned(), value);
+    }
 }
 
 impl fmt::Debug for LoxInstance {

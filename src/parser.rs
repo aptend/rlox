@@ -485,18 +485,21 @@ impl<'a> Parser<'a> {
         // we check if it is valid later
         let l_value = self.or_expr()?;
         if let Some(equal_tk) = self.advance_if_eq(&EQUAL) {
-            if let Expr::Variable(v) = l_value {
-                // it is a valid assignment, so we continue to
-                // parse right value recursively.
-                let value = self.assignment()?;
-                return Ok(Expr::new_assign(self.keygen.next(), v.name, value));
-            } else {
-                return Err(SyntaxError::InvalidAssignTarget(Box::new(
-                    equal_tk,
-                )));
+            match l_value {
+                Expr::Variable(v) => {
+                    // it is a valid assignment, so we continue to
+                    let value = self.assignment()?;
+                    Ok(Expr::new_assign(self.keygen.next(), v.name, value))
+                }
+                Expr::Get(g) => {
+                    let value = self.assignment()?;
+                    Ok(Expr::new_set(*g.object, g.name, value))
+                }
+                _ => Err(SyntaxError::InvalidAssignTarget(Box::new(equal_tk))),
             }
+        } else {
+            Ok(l_value)
         }
-        Ok(l_value)
     }
 
     fn expression(&mut self) -> ParseResult<Expr> {

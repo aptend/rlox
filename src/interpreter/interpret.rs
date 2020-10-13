@@ -21,6 +21,19 @@ impl Interpret for Expr {
             Expr::Logical(l) => l.interpret(interpreter),
             Expr::Call(c) => c.interpret(interpreter),
             Expr::Get(g) => g.interpret(interpreter),
+            Expr::Set(s) => s.interpret(interpreter),
+        }
+    }
+}
+
+impl Interpret for SetExpr {
+    fn interpret(&self, interpreter: &mut Interpreter) -> RuntimeResult<Value> {
+        if let Value::Instance(inst) = self.object.interpret(interpreter)? {
+            let value = self.value.interpret(interpreter)?;
+            inst.set(self.name.as_str().unwrap(), value.clone());
+            Ok(value)
+        } else {
+            Err(RuntimeError::NonInstanceGet(Box::new(self.name.clone())))
         }
     }
 }
@@ -28,11 +41,15 @@ impl Interpret for Expr {
 impl Interpret for GetExpr {
     fn interpret(&self, interpreter: &mut Interpreter) -> RuntimeResult<Value> {
         if let Value::Instance(inst) = self.object.interpret(interpreter)? {
+            match inst.get(self.name.as_str().unwrap()) {
+                Some(v) => Ok(v),
+                None => Err(RuntimeError::UndefinedProperty(Box::new(
+                    self.name.clone(),
+                ))),
+            }
         } else {
+            Err(RuntimeError::NonInstanceGet(Box::new(self.name.clone())))
         }
-        use crate::ast::AstPrint;
-        println!("{}", self.print_ast());
-        Ok(Value::default())
     }
 }
 

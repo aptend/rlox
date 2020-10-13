@@ -60,7 +60,7 @@ impl Execute for ClassStmt {
         // two-stage variable binding process allows
         // references to the class inside its own methods.
         interpreter.env.define(&self.name, Value::default())?;
-        let lox_class = Box::new(LoxClass::new(self.name.as_str().unwrap()));
+        let lox_class = Box::new(LoxClass::new(self, interpreter.env.clone()));
         interpreter
             .env
             .assign(&self.name, Value::new_callable(lox_class))?;

@@ -11,6 +11,7 @@ type ParseResult<T> = Result<T, SyntaxError>;
 enum FunctionType {
     None,
     Function,
+    Method,
 }
 
 // Let me try lifetime approach for Resolver
@@ -121,9 +122,13 @@ impl<'a> Resolver<'a> {
         }
     }
 
-    fn resolve_function(&mut self, stmt: &'a FunctionStmt) -> ParseResult<()> {
+    fn resolve_function(
+        &mut self,
+        stmt: &'a FunctionStmt,
+        fun_type: FunctionType,
+    ) -> ParseResult<()> {
         let enclosing_function = self.current_function;
-        self.current_function = FunctionType::Function;
+        self.current_function = fun_type;
         self.begin_scope();
         for param in &stmt.params {
             self.declare(param)?;
@@ -185,12 +190,16 @@ impl Resolve for Stmt {
             Stmt::Function(f) => {
                 resolver.declare(&f.name)?;
                 resolver.define(&f.name);
-                resolver.resolve_function(f)
+                resolver.resolve_function(f, FunctionType::Function)
             }
 
             Stmt::Class(c) => {
                 resolver.declare(&c.name)?;
                 resolver.define(&c.name);
+                let fun_type = FunctionType::Method;
+                for fun_stmt in &c.methods {
+                    resolver.resolve_function(fun_stmt, fun_type)?;
+                }
                 Ok(())
             }
 
@@ -245,14 +254,14 @@ impl Resolve for Expr {
                 resolver.resolve_local(a.expr_key, a.name.as_str().unwrap());
                 Ok(())
             }
+
+            // the following match arms exist to lead us in the maze of
+            // syntax tree
             Expr::Get(g) => g.object.resolve(resolver),
             Expr::Set(s) => {
                 s.object.resolve(resolver)?;
                 s.value.resolve(resolver)
             }
-
-            // the following match arms exist to lead us in the maze of
-            // syntax tree
             Expr::Unary(u) => u.right.resolve(resolver),
             Expr::Binary(b) => {
                 b.left.resolve(resolver)?;

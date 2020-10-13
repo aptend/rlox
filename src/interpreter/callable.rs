@@ -2,7 +2,10 @@ use std::cell::RefCell;
 use std::fmt;
 use std::rc::Rc;
 
-use super::{Environment, Interpreter, RuntimeResult, Value};
+use super::{
+    Environment, Interpreter, LoxInstance, RuntimeResult, Token, TokenKind,
+    Value,
+};
 
 use super::execute::execute_block_with_env;
 use crate::ast::FunctionStmt;
@@ -85,18 +88,26 @@ impl LoxCallable for NativeClock {
     }
 }
 
-/// --------------------------------------------------------------------------
-/// ----------- LoxFunction implementation -----------------------------------
-/// --------------------------------------------------------------------------
-
+#[derive(Clone)]
 pub struct LoxFunction {
-    func_stmt: FunctionStmt,
-    closure: Environment,
+    pub func_stmt: FunctionStmt,
+    pub closure: Environment,
 }
 
 impl LoxFunction {
     pub fn new(func_stmt: FunctionStmt, closure: Environment) -> Self {
         LoxFunction { func_stmt, closure }
+    }
+
+    pub fn bind(&self, inst: LoxInstance) -> Self {
+        let bound_env = Environment::with_enclosing(self.closure.clone());
+        bound_env
+            .define(&Token::with_kind(TokenKind::THIS), Value::Instance(inst))
+            .unwrap();
+        LoxFunction {
+            func_stmt: self.func_stmt.clone(),
+            closure: bound_env,
+        }
     }
 }
 

@@ -31,11 +31,10 @@ impl LoxClass {
             .methods
             .iter()
             .map(|m| {
-                (
-                    m.name.as_str().unwrap().to_owned(),
-                    // check init name here
-                    LoxFunction::new(m.clone(), env.clone()),
-                )
+                let name = m.name.as_str().unwrap().to_owned();
+                let lox_func =
+                    LoxFunction::new(m.clone(), env.clone(), name == "init");
+                (name, lox_func)
             })
             .collect();
 

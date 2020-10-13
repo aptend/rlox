@@ -1,0 +1,22 @@
+
+
+class Foo {
+  sayHello() {
+      var a = 12;
+      var a = 13;
+  }
+}
+
+return 42;
+
+class Bar {
+  init() {
+    return;
+  }
+}
+
+class Baz {
+  init() {
+    return 12;
+  }
+}

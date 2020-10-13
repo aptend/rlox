@@ -45,8 +45,11 @@ impl Execute for ReturnStmt {
 
 impl Execute for FunctionStmt {
     fn execute(&self, interpreter: &mut Interpreter) -> RuntimeResult<()> {
-        let lox_function =
-            Box::new(LoxFunction::new(self.clone(), interpreter.env.clone(), false));
+        let lox_function = Box::new(LoxFunction::new(
+            self.clone(),
+            interpreter.env.clone(),
+            false,
+        ));
 
         interpreter
             .env
@@ -59,6 +62,7 @@ impl Execute for ClassStmt {
     fn execute(&self, interpreter: &mut Interpreter) -> RuntimeResult<()> {
         // two-stage variable binding process allows
         // references to the class inside its own methods.
+        // TODO: What does this mean?
         interpreter.env.define(&self.name, Value::default())?;
         let lox_class = Box::new(LoxClass::new(self, interpreter.env.clone()));
         interpreter

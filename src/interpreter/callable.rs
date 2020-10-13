@@ -4,7 +4,7 @@ use std::rc::Rc;
 
 use super::{
     Environment, Interpreter, LoxInstance, RuntimeError, RuntimeResult, Token,
-    TokenKind, Value,
+    Value,
 };
 
 use super::execute::execute_block_with_env;
@@ -96,14 +96,22 @@ pub struct LoxFunction {
 }
 
 impl LoxFunction {
-    pub fn new(func_stmt: FunctionStmt, closure: Environment, is_initializer: bool) -> Self {
-        LoxFunction { func_stmt, closure, is_initializer }
+    pub fn new(
+        func_stmt: FunctionStmt,
+        closure: Environment,
+        is_initializer: bool,
+    ) -> Self {
+        LoxFunction {
+            func_stmt,
+            closure,
+            is_initializer,
+        }
     }
 
     pub fn bind(&self, inst: LoxInstance) -> Self {
         let bound_env = Environment::with_enclosing(self.closure.clone());
         bound_env
-            .define(&Token::with_kind(TokenKind::THIS), Value::Instance(inst))
+            .define(&Token::new_this(), Value::Instance(inst))
             .unwrap();
         LoxFunction {
             func_stmt: self.func_stmt.clone(),
@@ -131,10 +139,12 @@ impl LoxCallable for LoxFunction {
             &self.func_stmt.body,
             interpreter,
             local_env,
-        ).and(Ok(Value::default())) {
+        )
+        .and(Ok(Value::default()))
+        {
             Err(RuntimeError::ReturnControl(v)) | Ok(v) => {
                 if self.is_initializer {
-                    Ok(self.closure.get_at(0, "init").unwrap())
+                    Ok(self.closure.get_at(0, &Token::new_this()).unwrap())
                 } else {
                     Ok(v)
                 }

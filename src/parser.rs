@@ -98,6 +98,7 @@ pub enum SyntaxError {
     BreakOutside(BoxToken),
     // raise by resovler
     ReturnOutside(BoxToken),
+    ReturnValueInInit(BoxToken),
     ThisOutside(BoxToken),
     ReadLocalInitializer(BoxToken),
     AlreadyExistVarInScope(BoxToken),
@@ -179,6 +180,10 @@ impl fmt::Display for SyntaxError {
             SyntaxError::ReturnOutside(t) => {
                 write_position(f, t)?;
                 write!(f, "Can't return from top-level code.")
+            }
+            SyntaxError::ReturnValueInInit(t) => {
+                write_position(f, t)?;
+                write!(f, "Can't return a value from an initializer.")
             }
             SyntaxError::ThisOutside(t) => {
                 write_position(f, t)?;

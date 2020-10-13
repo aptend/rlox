@@ -42,3 +42,15 @@ bill.name = "Bill";
 
 bill.sayName = jane.sayName;
 bill.sayName(); // Prints "Jane"
+
+
+class Lang {
+  init(name, span) {
+    this.name = name;
+    this.span = span;
+  }
+}
+
+var go = Lang("Go", 9);
+print go.init("Rust", 5); // Prints <Lang instance>.
+print go.span;            // Prints 5.

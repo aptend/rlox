@@ -7,11 +7,14 @@ use std::collections::hash_map::{Entry, HashMap};
 
 type ParseResult<T> = Result<T, SyntaxError>;
 
+//TODO: [IMPORTANT] Review if it is neccesary to return from error? Understand panic mode
+
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 enum FunctionType {
     None,
     Function,
     Method,
+    Initializer,
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
@@ -84,6 +87,9 @@ impl<'a> Resolver<'a> {
         self.scopes.pop().unwrap();
     }
 
+    // we start resolve from global environment without a corresponding scope
+    // which means duplicated decalarations of variable / function / class
+    // are allowed, and the last one wins.
     fn declare(&mut self, name: &'a Token) -> ParseResult<()> {
         if let Some(scope) = self.scopes.last_mut() {
             let name_str: &str = name.as_str().unwrap();
@@ -213,14 +219,39 @@ impl Resolve for Stmt {
                 resolver.current_class = ClassType::Class;
                 resolver.declare(&c.name)?;
                 resolver.define(&c.name);
-                // mock the bound environment first
+                // mock the bound environment, where 'this' lives
                 resolver.begin_scope();
                 resolver.define_str("this");
-                let fun_type = FunctionType::Method;
-                for fun_stmt in &c.methods {
-                    // no need to declare methods' names
-                    // they are stored in LoxClass instead of environment
-                    resolver.resolve_function(fun_stmt, fun_type)?;
+                for stmt in &c.methods {
+                    // No declare & define method's name here, because
+                    // it is stored in LoxClass instead of environment.
+                    //
+                    // With defining name here, duplicated method declarations
+                    // will be denied. I think this is helpful in large
+                    // codebase
+                    //
+                    // What is the cost? In the following code snippet
+                    //
+                    // fun say_hi { print "hi"; }
+                    // class Foo {
+                    //    say_hi() { print "hi, foo"; }
+                    //    say_any() { say_hi(); }
+                    // }
+                    //
+                    // calls foo.say_any() will find say_hi in bound env
+                    // where no 'say_hi' lives, during runtime. Then it
+                    // will search in its enclosing env, along up to the global.
+                    //
+                    // It's acceptable.
+
+                    let fun_type = if stmt.name.as_str().unwrap() == "init" {
+                        FunctionType::Initializer
+                    } else {
+                        FunctionType::Method
+                    };
+                    resolver.declare(&stmt.name)?;
+                    resolver.define(&stmt.name);
+                    resolver.resolve_function(stmt, fun_type)?;
                 }
                 resolver.end_scope();
                 resolver.current_class = current_class;
@@ -231,13 +262,15 @@ impl Resolve for Stmt {
             // syntax tree
             Stmt::Print(p) => p.resolve(resolver),
             Stmt::Expression(e) => e.resolve(resolver),
-            Stmt::Return(r) => {
-                if resolver.current_function == FunctionType::None {
+            Stmt::Return(r) => match resolver.current_function {
+                FunctionType::None => {
                     Err(SyntaxError::ReturnOutside(Box::new(r.ret_tk.clone())))
-                } else {
-                    r.value.resolve(resolver)
                 }
-            }
+                FunctionType::Initializer if Expr::is_nil(&r.value) => Err(
+                    SyntaxError::ReturnValueInInit(Box::new(r.ret_tk.clone())),
+                ),
+                _ => r.value.resolve(resolver),
+            },
             Stmt::While(w) => {
                 w.cond.resolve(resolver)?;
                 w.body.resolve(resolver)

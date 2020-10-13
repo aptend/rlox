@@ -81,6 +81,10 @@ impl Token {
         }
     }
 
+    pub(crate) fn new_this() -> Token {
+        Token::with_kind(TokenKind::THIS)
+    }
+
     pub fn as_str(&self) -> Option<&str> {
         match &self.kind {
             TokenKind::IDENTIFIER(s) => Some(s),

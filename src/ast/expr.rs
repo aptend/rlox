@@ -98,6 +98,13 @@ impl Expr {
     pub fn new_this(expr_key: u64, this_tk: Token) -> Expr {
         Expr::This(ThisExpr { expr_key, this_tk })
     }
+
+    pub fn is_nil(expr: &Expr) -> bool {
+        match expr {
+            Expr::Literal(Literal::Nil) => true,
+            _ => false,
+        }
+    }
 }
 
 impl std::default::Default for Expr {

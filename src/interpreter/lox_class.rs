@@ -9,7 +9,7 @@ use std::rc::Rc;
 
 #[derive(Clone)]
 pub struct LoxClass {
-    inner: Rc<ClassInner>
+    inner: Rc<ClassInner>,
 }
 
 impl std::ops::Deref for LoxClass {
@@ -25,24 +25,21 @@ pub struct ClassInner {
 
 impl LoxClass {
     pub fn new(cls_stmt: &ClassStmt, env: Environment) -> Self {
-        let name = cls_stmt.name.as_str().unwrap().clone();
+        let name = cls_stmt.name.as_str().unwrap().to_owned();
 
         let methods = cls_stmt
             .methods
             .iter()
             .map(|m| {
                 (
-                    m.name.as_str().unwrap().clone(),
+                    m.name.as_str().unwrap().to_owned(),
                     LoxFunction::new(m.clone(), env.clone()),
                 )
             })
             .collect();
 
         LoxClass {
-            inner: Rc::new(ClassInner {
-                name,
-                methods,
-            })
+            inner: Rc::new(ClassInner { name, methods }),
         }
     }
 }
@@ -57,9 +54,7 @@ impl LoxCallable for LoxClass {
         _interpreter: &mut Interpreter,
         _args: Vec<Value>,
     ) -> RuntimeResult<Value> {
-        Ok(Value::Instance(LoxInstance::new(
-            self.clone(),
-        )))
+        Ok(Value::Instance(LoxInstance::new(self.clone())))
     }
 }
 
@@ -95,7 +90,7 @@ impl LoxInstance {
             .class
             .methods
             .get(name)
-            .map(|func| Value::new_callable(Box::new(func.clone())))
+            .map(|func| Value::new_callable(Box::new(func.bind(self.clone()))))
     }
 
     pub fn get(&self, name: &str) -> Option<Value> {

@@ -81,10 +81,12 @@ impl Token {
         }
     }
 
-    pub fn as_str(&self) -> Option<&String> {
+    pub fn as_str(&self) -> Option<&str> {
         match &self.kind {
             TokenKind::IDENTIFIER(s) => Some(s),
             TokenKind::STRING(s) => Some(s),
+            TokenKind::THIS => Some("this"),
+            TokenKind::SUPER => Some("super"),
             _ => None,
         }
     }

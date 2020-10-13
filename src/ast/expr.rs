@@ -1,4 +1,6 @@
 use crate::scanner::Token;
+
+type ExprKey = u64;
 pub enum Expr {
     Unary(UnaryExpr),
     Binary(BinaryExpr),
@@ -10,6 +12,7 @@ pub enum Expr {
     Call(CallExpr),
     Get(GetExpr),
     Set(SetExpr),
+    This(ThisExpr),
 }
 
 impl Expr {
@@ -91,6 +94,10 @@ impl Expr {
             value: Box::new(value),
         })
     }
+
+    pub fn new_this(expr_key: u64, this_tk: Token) -> Expr {
+        Expr::This(ThisExpr { expr_key, this_tk })
+    }
 }
 
 impl std::default::Default for Expr {
@@ -130,12 +137,12 @@ pub enum Literal {
 // expr_key is used for variable resovling,
 // refer to the comments in Resovler::resolve_local
 pub struct VariableExpr {
-    pub expr_key: u64,
+    pub expr_key: ExprKey,
     pub name: Token,
 }
 
 pub struct AssignExpr {
-    pub expr_key: u64,
+    pub expr_key: ExprKey,
     pub name: Token,
     pub value: Box<Expr>,
 }
@@ -155,4 +162,9 @@ pub struct SetExpr {
     pub object: Box<Expr>,
     pub name: Token,
     pub value: Box<Expr>,
+}
+
+pub struct ThisExpr {
+    pub expr_key: ExprKey,
+    pub this_tk: Token,
 }

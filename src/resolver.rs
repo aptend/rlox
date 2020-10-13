@@ -100,6 +100,13 @@ impl<'a> Resolver<'a> {
         }
     }
 
+    // for 'this' and 'super'
+    fn define_str(&mut self, name: &'static str) {
+        if let Some(scope) = self.scopes.last_mut() {
+            scope.insert(name, true);
+        }
+    }
+
     // Resolver figures out how many hops to take during resovling a expression
     //
     // jlox stores these information in a HashMap<Expr, int>
@@ -196,10 +203,14 @@ impl Resolve for Stmt {
             Stmt::Class(c) => {
                 resolver.declare(&c.name)?;
                 resolver.define(&c.name);
+                // mock the bound environment first
+                resolver.begin_scope();
+                resolver.define_str("this");
                 let fun_type = FunctionType::Method;
                 for fun_stmt in &c.methods {
                     resolver.resolve_function(fun_stmt, fun_type)?;
                 }
+                resolver.end_scope();
                 Ok(())
             }
 
@@ -252,6 +263,11 @@ impl Resolve for Expr {
             Expr::Assign(a) => {
                 a.value.resolve(resolver)?;
                 resolver.resolve_local(a.expr_key, a.name.as_str().unwrap());
+                Ok(())
+            }
+
+            Expr::This(t) => {
+                resolver.resolve_local(t.expr_key, "this");
                 Ok(())
             }
 

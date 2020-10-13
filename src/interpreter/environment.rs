@@ -5,6 +5,10 @@ use std::rc::Rc;
 use super::{RuntimeError, RuntimeResult, Value};
 use crate::scanner::Token;
 
+// TODO:
+// simplify env call
+// remove token-related things, caller should report error?
+
 pub struct Environment {
     // multiple nest scopes could refer to the same top level scope
     // they have to hold shared muttablity (in single thread)
@@ -50,7 +54,7 @@ impl EnvInner {
     }
 
     pub fn define(&mut self, token: &Token, val: Value) -> RuntimeResult<()> {
-        self.map.insert(token.as_str().unwrap().clone(), val);
+        self.map.insert(token.as_str().unwrap().to_owned(), val);
         Ok(())
     }
 

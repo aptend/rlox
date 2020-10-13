@@ -356,6 +356,10 @@ impl<'a> Parser<'a> {
             return Ok(Expr::default());
         }
 
+        if let Some(this_tk) = self.advance_if_eq(&THIS) {
+            return Ok(Expr::new_this(self.keygen.next(), this_tk));
+        }
+
         if let Some(t) = self.advance_if_eq(&IDENTIFIER) {
             // move this token into expr
             return Ok(Expr::new_variable(self.keygen.next(), t));

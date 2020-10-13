@@ -22,6 +22,9 @@ impl Interpret for Expr {
             Expr::Call(c) => c.interpret(interpreter),
             Expr::Get(g) => g.interpret(interpreter),
             Expr::Set(s) => s.interpret(interpreter),
+            Expr::This(t) => {
+                interpreter.lookup_variable(&t.expr_key, &t.this_tk)
+            }
         }
     }
 }

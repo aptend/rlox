@@ -30,6 +30,7 @@ impl AstPrint for Expr {
             Expr::Call(v) => v.print_ast(),
             Expr::Get(v) => v.print_ast(),
             Expr::Set(v) => v.print_ast(),
+            Expr::This(_) => "this".to_string(),
         }
     }
 }

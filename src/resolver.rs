@@ -270,7 +270,7 @@ impl Resolve for Stmt {
                     )));
                     Ok(())
                 }
-                FunctionType::Initializer if Expr::is_nil(&r.value) => {
+                FunctionType::Initializer if !Expr::is_nil(&r.value) => {
                     resolver.errors.push(SyntaxError::ReturnValueInInit(
                         Box::new(r.ret_tk.clone()),
                     ));

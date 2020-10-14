@@ -23,3 +23,8 @@ cream.cook();
 // Prints:
 // Fry until golden brown.
 // Pipe full of custard and coat with chocolate.
+
+
+var NotAClass = "I am totally not a class";
+
+class Subclass < NotAClass {} // RuntimeError

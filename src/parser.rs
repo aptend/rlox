@@ -85,6 +85,7 @@ impl fmt::Display for SynCxt {
 }
 
 // TODO: factor out BoxToken to common field?
+// use String error
 #[derive(Debug)]
 pub enum SyntaxError {
     ExpectExpression(BoxToken),
@@ -101,6 +102,8 @@ pub enum SyntaxError {
     ReturnOutside(BoxToken),
     ReturnValueInInit(BoxToken),
     ThisOutside(BoxToken),
+    SuperOutside(BoxToken),
+    SuperInNormalClass(BoxToken),
     ReadLocalInitializer(BoxToken),
     AlreadyExistInScope(BoxToken),
     InheriteSelf(BoxToken),
@@ -197,6 +200,14 @@ impl fmt::Display for SyntaxError {
             SyntaxError::ThisOutside(t) => {
                 write_position(f, t)?;
                 write!(f, "Can't use 'this' outside of a class.")
+            }
+            SyntaxError::SuperOutside(t) => {
+                write_position(f, t)?;
+                write!(f, "Can't use 'this' outside of a class.")
+            }
+            SyntaxError::SuperInNormalClass(t) => {
+                write_position(f, t)?;
+                write!(f, "Can't use 'super' in a class with no superclass.")
             }
             SyntaxError::InheriteSelf(t) => {
                 write_position(f, t)?;

@@ -102,6 +102,7 @@ pub enum SyntaxError {
     ThisOutside(BoxToken),
     ReadLocalInitializer(BoxToken),
     AlreadyExistInScope(BoxToken),
+    InheriteSelf(BoxToken),
     // raise by scanner
     LexError(ScanError),
 }
@@ -191,6 +192,10 @@ impl fmt::Display for SyntaxError {
             SyntaxError::ThisOutside(t) => {
                 write_position(f, t)?;
                 write!(f, "Can't use 'this' outside of a class.")
+            }
+            SyntaxError::InheriteSelf(t) => {
+                write_position(f, t)?;
+                write!(f, "A class can't inherit from itself.")
             }
         }
     }
@@ -707,6 +712,13 @@ impl<'a> Parser<'a> {
     fn class_decl_stmt(&mut self) -> ParseResult<Stmt> {
         let cxt = Some(SynCxt::ClassDecl);
         let name = self.consume_or_err(&IDENTIFIER, cxt)?;
+        let superclass = if self.advance_if_eq(&LESS).is_some() {
+            let token = self.consume_or_err(&IDENTIFIER, cxt)?;
+            // superclass variable
+            Some(Expr::new_variable(self.keygen.next(), token))
+        } else {
+            None
+        };
         self.consume_or_err(&LEFT_BRACE, cxt)?;
 
         let mut methods = Vec::new();
@@ -727,7 +739,7 @@ impl<'a> Parser<'a> {
             })
             .collect();
 
-        Ok(Stmt::new_class(name, methods))
+        Ok(Stmt::new_class(name, superclass, methods))
     }
 
     fn declaration(&mut self) -> ParseResult<Stmt> {

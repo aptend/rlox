@@ -220,6 +220,18 @@ impl Resolve for Stmt {
                 resolver.current_class = ClassType::Class;
                 resolver.declare(&c.name)?;
                 resolver.define(&c.name);
+                if let Some(superclass) = &c.superclass {
+                    let superclass_name = match superclass {
+                        Expr::Variable(v) => v.name.as_str().unwrap(),
+                        _ => "",
+                    };
+                    if c.name.as_str().unwrap() == superclass_name {
+                        resolver.errors.push(SyntaxError::InheriteSelf(
+                            Box::new(c.name.clone()),
+                        ))
+                    }
+                    superclass.resolve(resolver)?;
+                }
                 // mock the bound environment, where 'this' lives
                 resolver.begin_scope();
                 resolver.define_str("this");

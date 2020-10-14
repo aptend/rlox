@@ -59,25 +59,30 @@ impl Interpret for GetExpr {
 impl Interpret for CallExpr {
     fn interpret(&self, interpreter: &mut Interpreter) -> RuntimeResult<Value> {
         // check type
-        if let Value::Callable(callee) = self.callee.interpret(interpreter)? {
-            // check arity
-            let (expect, got) = (callee.arity(), self.arguments.len() as u8);
-            if expect != got {
-                return Err(RuntimeError::ArityMismatch(
-                    Box::new(self.pos_tk.clone()),
-                    expect,
-                    got,
-                ));
+        let value = self.callee.interpret(interpreter)?;
+        let callee = match value {
+            Value::Callable(ref call) => call as &dyn LoxCallable,
+            Value::Class(ref cls) => cls as &dyn LoxCallable,
+            _ => {
+                return Err(RuntimeError::NonCallable(Box::new(
+                    self.pos_tk.clone(),
+                )))
             }
-            // eval args and call
-            let mut args = Vec::new();
-            for arg in &self.arguments {
-                args.push(arg.interpret(interpreter)?);
-            }
-            callee.call(interpreter, args)
-        } else {
-            Err(RuntimeError::NonCallable(Box::new(self.pos_tk.clone())))
+        };
+        let (expect, got) = (callee.arity(), self.arguments.len() as u8);
+        if expect != got {
+            return Err(RuntimeError::ArityMismatch(
+                Box::new(self.pos_tk.clone()),
+                expect,
+                got,
+            ));
         }
+        // eval args and call
+        let mut args = Vec::new();
+        for arg in &self.arguments {
+            args.push(arg.interpret(interpreter)?);
+        }
+        callee.call(interpreter, args)
     }
 }
 

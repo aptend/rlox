@@ -60,14 +60,43 @@ impl Execute for FunctionStmt {
 
 impl Execute for ClassStmt {
     fn execute(&self, interpreter: &mut Interpreter) -> RuntimeResult<()> {
+        let superclass = if let Some(ref supcls) = self.superclass {
+            match supcls.interpret(interpreter)? {
+                Value::Class(cls) => Some(cls),
+                _ => {
+                    return Err(RuntimeError::NonClassSuper(Box::new(
+                        self.name.clone(),
+                    )))
+                }
+            }
+        } else {
+            None
+        };
         // two-stage variable binding process allows
         // references to the class inside its own methods.
         // TODO: What does this mean?
         interpreter.env.define(&self.name, Value::default())?;
-        let lox_class = Box::new(LoxClass::new(self, interpreter.env.clone()));
-        interpreter
+
+        let methods = self
+            .methods
+            .iter()
+            .map(|m| {
+                let name = m.name.as_str().unwrap().to_owned();
+                let lox_func = LoxFunction::new(
+                    m.clone(),
+                    interpreter.env.clone(),
+                    name == "init",
+                );
+                (name, lox_func)
+            })
+            .collect();
+
+        let lox_class =
+            LoxClass::new(self.name.as_str().unwrap(), superclass, methods);
+
+            interpreter
             .env
-            .assign(&self.name, Value::new_callable(lox_class))?;
+            .assign(&self.name, Value::Class(lox_class))?;
         Ok(())
     }
 }

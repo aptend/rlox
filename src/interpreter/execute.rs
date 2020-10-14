@@ -1,5 +1,5 @@
 use super::Interpret;
-use super::{Environment, Interpreter, LoxClass, LoxFunction, Value};
+use super::{Environment, Interpreter, LoxClass, LoxFunction, Token, Value};
 use super::{RuntimeError, RuntimeResult};
 use crate::ast::stmt::*;
 
@@ -72,21 +72,31 @@ impl Execute for ClassStmt {
         } else {
             None
         };
+
         // two-stage variable binding process allows
         // references to the class inside its own methods.
-        // TODO: What does this mean?
-        interpreter.env.define(&self.name, Value::default())?;
+        // TODO: What does this mean? No idea about this yet.
+        // interpreter.env.define(&self.name, Value::default())?;
 
+        let env = if superclass.is_some() {
+            // set up super environment for all methods in current class
+            let val = superclass.as_ref().cloned().unwrap();
+            let env = Environment::with_enclosing(interpreter.env.clone());
+            env.define(&Token::new_super(), Value::Class(val)).unwrap();
+            env
+        } else {
+            interpreter.env.clone()
+        };
+
+        println!("execute class {}", self.name.as_str().unwrap());
         let methods = self
             .methods
             .iter()
             .map(|m| {
                 let name = m.name.as_str().unwrap().to_owned();
-                let lox_func = LoxFunction::new(
-                    m.clone(),
-                    interpreter.env.clone(),
-                    name == "init",
-                );
+                println!("  collect method {}", name);
+                let lox_func =
+                    LoxFunction::new(m.clone(), env.clone(), name == "init");
                 (name, lox_func)
             })
             .collect();
@@ -94,9 +104,9 @@ impl Execute for ClassStmt {
         let lox_class =
             LoxClass::new(self.name.as_str().unwrap(), superclass, methods);
 
-            interpreter
+        interpreter
             .env
-            .assign(&self.name, Value::Class(lox_class))?;
+            .define(&self.name, Value::Class(lox_class))?;
         Ok(())
     }
 }

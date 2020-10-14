@@ -92,6 +92,7 @@ pub enum SyntaxError {
     ExpectRightParen(BoxToken),
     ExpectRightBrace(BoxToken),
     ExpectSemicolon(BoxToken),
+    ExpectDot(BoxToken),
     ExpectIdentifier(BoxToken, SynCxt),
     InvalidAssignTarget(BoxToken),
     TooManyArguments(BoxToken),
@@ -129,6 +130,10 @@ impl fmt::Display for SyntaxError {
             SyntaxError::ExpectExpression(t) => {
                 write_position(f, t)?;
                 write!(f, "expect an expression, but '{:?}' found", t)
+            }
+            SyntaxError::ExpectDot(t) => {
+                write_position(f, t)?;
+                write!(f, "expect a dot after super, but '{:?}' found", t)
             }
             SyntaxError::ExpectLeftParen(t) => {
                 write_position(f, t)?;
@@ -315,6 +320,7 @@ impl<'a> Parser<'a> {
                 TokenKind::IDENTIFIER(_) => {
                     Err(SyntaxError::ExpectIdentifier(tk, cxt.unwrap()))
                 }
+                TokenKind::DOT => Err(SyntaxError::ExpectDot(tk)),
                 _ => unimplemented!(),
             }
         }
@@ -376,6 +382,12 @@ impl<'a> Parser<'a> {
 
         if let Some(this_tk) = self.advance_if_eq(&THIS) {
             return Ok(Expr::new_this(self.keygen.next(), this_tk));
+        }
+
+        if let Some(super_tk) = self.advance_if_eq(&SUPER) {
+            self.consume_or_err(&DOT, None)?;
+            let method = self.consume_or_err(&IDENTIFIER, None)?;
+            return Ok(Expr::new_super(self.keygen.next(), super_tk, method));
         }
 
         if let Some(t) = self.advance_if_eq(&IDENTIFIER) {

@@ -45,8 +45,12 @@ impl LoxClass {
         }
     }
 
-    fn find_method(&self, name: &str) -> Option<&LoxFunction> {
-        self.methods.get(name)
+    pub(crate) fn find_method(&self, name: &str) -> Option<&LoxFunction> {
+        self.methods.get(name).or_else(|| {
+            self.superclass
+                .as_ref()
+                .and_then(|cls| cls.find_method(name))
+        })
     }
 }
 

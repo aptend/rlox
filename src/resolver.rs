@@ -231,7 +231,11 @@ impl Resolve for Stmt {
                         ))
                     }
                     superclass.resolve(resolver)?;
+                    // mock the superclass env where 'super' lives
+                    resolver.begin_scope();
+                    resolver.define_str("super");
                 }
+
                 // mock the bound environment, where 'this' lives
                 resolver.begin_scope();
                 resolver.define_str("this");
@@ -267,6 +271,9 @@ impl Resolve for Stmt {
                     resolver.resolve_function(stmt, fun_type)?;
                 }
                 resolver.end_scope();
+                if c.superclass.is_some() {
+                    resolver.end_scope();
+                }
                 resolver.current_class = current_class;
                 Ok(())
             }
@@ -342,6 +349,11 @@ impl Resolve for Expr {
                 } else {
                     resolver.resolve_local(t.expr_key, "this");
                 }
+                Ok(())
+            }
+
+            Expr::Super(s) => {
+                resolver.resolve_local(s.expr_key, "super");
                 Ok(())
             }
 

@@ -85,6 +85,10 @@ impl Token {
         Token::with_kind(TokenKind::THIS)
     }
 
+    pub(crate) fn new_super() -> Token {
+        Token::with_kind(TokenKind::SUPER)
+    }
+
     pub fn as_str(&self) -> Option<&str> {
         match &self.kind {
             TokenKind::IDENTIFIER(s) => Some(s),

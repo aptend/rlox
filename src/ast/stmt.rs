@@ -74,8 +74,16 @@ impl Stmt {
         })
     }
 
-    pub fn new_class(name: Token, methods: Vec<FunctionStmt>) -> Stmt {
-        Stmt::Class(ClassStmt { name, methods })
+    pub fn new_class(
+        name: Token,
+        superclass: Option<Expr>,
+        methods: Vec<FunctionStmt>,
+    ) -> Stmt {
+        Stmt::Class(ClassStmt {
+            name,
+            superclass,
+            methods,
+        })
     }
 }
 
@@ -132,5 +140,6 @@ pub struct FuncInner {
 
 pub struct ClassStmt {
     pub name: Token,
+    pub superclass: Option<Expr>, // VariableExpr
     pub methods: Vec<FunctionStmt>,
 }

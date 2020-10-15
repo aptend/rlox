@@ -1,4 +1,4 @@
-use super::{Callable, LoxCallable, LoxInstance};
+use super::{Callable, LoxCallable, LoxClass, LoxInstance};
 use std::fmt;
 use std::ops::Deref;
 use std::rc::Rc;
@@ -11,6 +11,7 @@ pub enum Value {
     Boolean(bool),
     Callable(Callable),
     Instance(LoxInstance),
+    Class(LoxClass),
 }
 
 impl Value {
@@ -44,6 +45,7 @@ impl fmt::Display for Value {
             Value::Boolean(b) => write!(f, "{}", b),
             Value::Callable(c) => write!(f, "{:?}", c.deref().deref()),
             Value::Instance(i) => write!(f, "{:?}", i),
+            Value::Class(c) => write!(f, "{:?}", c),
         }
     }
 }

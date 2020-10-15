@@ -1,0 +1,30 @@
+class Doughnut {
+  cook() {
+    print "Fry until golden brown.";
+  }
+
+  sell() {
+    print "On Sale";
+  }
+}
+
+class BostonCream < Doughnut {
+  cook() {
+    super.cook();
+    print "Pipe full of custard and coat with chocolate.";
+    var inner = BostonCream();
+    inner.sell();
+  }
+}
+
+var cream = BostonCream();
+cream.sell();  // Prints "On Sale"
+cream.cook();
+// Prints:
+// Fry until golden brown.
+// Pipe full of custard and coat with chocolate.
+
+
+var NotAClass = "I am totally not a class";
+
+class Subclass < NotAClass {} // RuntimeError

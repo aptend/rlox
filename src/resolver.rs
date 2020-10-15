@@ -21,6 +21,7 @@ enum FunctionType {
 enum ClassType {
     None,
     Class,
+    Subclass
 }
 
 // Let me try lifetime approach for Resolver
@@ -220,6 +221,23 @@ impl Resolve for Stmt {
                 resolver.current_class = ClassType::Class;
                 resolver.declare(&c.name)?;
                 resolver.define(&c.name);
+                if let Some(superclass) = &c.superclass {
+                    resolver.current_class = ClassType::Subclass;
+                    let superclass_name = match superclass {
+                        Expr::Variable(v) => v.name.as_str().unwrap(),
+                        _ => "",
+                    };
+                    if c.name.as_str().unwrap() == superclass_name {
+                        resolver.errors.push(SyntaxError::InheriteSelf(
+                            Box::new(c.name.clone()),
+                        ))
+                    }
+                    superclass.resolve(resolver)?;
+                    // mock the superclass env where 'super' lives
+                    resolver.begin_scope();
+                    resolver.define_str("super");
+                }
+
                 // mock the bound environment, where 'this' lives
                 resolver.begin_scope();
                 resolver.define_str("this");
@@ -255,6 +273,9 @@ impl Resolve for Stmt {
                     resolver.resolve_function(stmt, fun_type)?;
                 }
                 resolver.end_scope();
+                if c.superclass.is_some() {
+                    resolver.end_scope();
+                }
                 resolver.current_class = current_class;
                 Ok(())
             }
@@ -270,7 +291,7 @@ impl Resolve for Stmt {
                     )));
                     Ok(())
                 }
-                FunctionType::Initializer if Expr::is_nil(&r.value) => {
+                FunctionType::Initializer if !Expr::is_nil(&r.value) => {
                     resolver.errors.push(SyntaxError::ReturnValueInInit(
                         Box::new(r.ret_tk.clone()),
                     ));
@@ -329,6 +350,25 @@ impl Resolve for Expr {
                     )));
                 } else {
                     resolver.resolve_local(t.expr_key, "this");
+                }
+                Ok(())
+            }
+
+            Expr::Super(s) => {
+                match resolver.current_class {
+                    ClassType::None => {
+                        resolver.errors.push(SyntaxError::SuperOutside(Box::new(
+                        s.super_tk.clone(),
+                    )));
+                    }
+                    ClassType::Class => {
+                        resolver.errors.push(SyntaxError::SuperInNormalClass(Box::new(
+                        s.super_tk.clone(),
+                    )));
+                    }
+                    ClassType::Subclass => {
+                        resolver.resolve_local(s.expr_key, "super");
+                    }
                 }
                 Ok(())
             }

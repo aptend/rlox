@@ -13,6 +13,7 @@ pub enum Expr {
     Get(GetExpr),
     Set(SetExpr),
     This(ThisExpr),
+    Super(SuperExpr),
 }
 
 impl Expr {
@@ -99,6 +100,14 @@ impl Expr {
         Expr::This(ThisExpr { expr_key, this_tk })
     }
 
+    pub fn new_super(expr_key: u64, super_tk: Token, method: Token) -> Expr {
+        Expr::Super(SuperExpr {
+            expr_key,
+            super_tk,
+            method,
+        })
+    }
+
     pub fn is_nil(expr: &Expr) -> bool {
         match expr {
             Expr::Literal(Literal::Nil) => true,
@@ -174,4 +183,10 @@ pub struct SetExpr {
 pub struct ThisExpr {
     pub expr_key: ExprKey,
     pub this_tk: Token,
+}
+
+pub struct SuperExpr {
+    pub expr_key: ExprKey,
+    pub super_tk: Token,
+    pub method: Token,
 }

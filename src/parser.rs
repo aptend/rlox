@@ -85,6 +85,7 @@ impl fmt::Display for SynCxt {
 }
 
 // TODO: factor out BoxToken to common field?
+// use String error
 #[derive(Debug)]
 pub enum SyntaxError {
     ExpectExpression(BoxToken),
@@ -92,6 +93,7 @@ pub enum SyntaxError {
     ExpectRightParen(BoxToken),
     ExpectRightBrace(BoxToken),
     ExpectSemicolon(BoxToken),
+    ExpectDot(BoxToken),
     ExpectIdentifier(BoxToken, SynCxt),
     InvalidAssignTarget(BoxToken),
     TooManyArguments(BoxToken),
@@ -100,8 +102,11 @@ pub enum SyntaxError {
     ReturnOutside(BoxToken),
     ReturnValueInInit(BoxToken),
     ThisOutside(BoxToken),
+    SuperOutside(BoxToken),
+    SuperInNormalClass(BoxToken),
     ReadLocalInitializer(BoxToken),
     AlreadyExistInScope(BoxToken),
+    InheriteSelf(BoxToken),
     // raise by scanner
     LexError(ScanError),
 }
@@ -128,6 +133,10 @@ impl fmt::Display for SyntaxError {
             SyntaxError::ExpectExpression(t) => {
                 write_position(f, t)?;
                 write!(f, "expect an expression, but '{:?}' found", t)
+            }
+            SyntaxError::ExpectDot(t) => {
+                write_position(f, t)?;
+                write!(f, "expect a dot after super, but '{:?}' found", t)
             }
             SyntaxError::ExpectLeftParen(t) => {
                 write_position(f, t)?;
@@ -191,6 +200,18 @@ impl fmt::Display for SyntaxError {
             SyntaxError::ThisOutside(t) => {
                 write_position(f, t)?;
                 write!(f, "Can't use 'this' outside of a class.")
+            }
+            SyntaxError::SuperOutside(t) => {
+                write_position(f, t)?;
+                write!(f, "Can't use 'this' outside of a class.")
+            }
+            SyntaxError::SuperInNormalClass(t) => {
+                write_position(f, t)?;
+                write!(f, "Can't use 'super' in a class with no superclass.")
+            }
+            SyntaxError::InheriteSelf(t) => {
+                write_position(f, t)?;
+                write!(f, "A class can't inherit from itself.")
             }
         }
     }
@@ -310,6 +331,7 @@ impl<'a> Parser<'a> {
                 TokenKind::IDENTIFIER(_) => {
                     Err(SyntaxError::ExpectIdentifier(tk, cxt.unwrap()))
                 }
+                TokenKind::DOT => Err(SyntaxError::ExpectDot(tk)),
                 _ => unimplemented!(),
             }
         }
@@ -371,6 +393,12 @@ impl<'a> Parser<'a> {
 
         if let Some(this_tk) = self.advance_if_eq(&THIS) {
             return Ok(Expr::new_this(self.keygen.next(), this_tk));
+        }
+
+        if let Some(super_tk) = self.advance_if_eq(&SUPER) {
+            self.consume_or_err(&DOT, None)?;
+            let method = self.consume_or_err(&IDENTIFIER, None)?;
+            return Ok(Expr::new_super(self.keygen.next(), super_tk, method));
         }
 
         if let Some(t) = self.advance_if_eq(&IDENTIFIER) {
@@ -707,6 +735,13 @@ impl<'a> Parser<'a> {
     fn class_decl_stmt(&mut self) -> ParseResult<Stmt> {
         let cxt = Some(SynCxt::ClassDecl);
         let name = self.consume_or_err(&IDENTIFIER, cxt)?;
+        let superclass = if self.advance_if_eq(&LESS).is_some() {
+            let token = self.consume_or_err(&IDENTIFIER, cxt)?;
+            // superclass variable
+            Some(Expr::new_variable(self.keygen.next(), token))
+        } else {
+            None
+        };
         self.consume_or_err(&LEFT_BRACE, cxt)?;
 
         let mut methods = Vec::new();
@@ -727,7 +762,7 @@ impl<'a> Parser<'a> {
             })
             .collect();
 
-        Ok(Stmt::new_class(name, methods))
+        Ok(Stmt::new_class(name, superclass, methods))
     }
 
     fn declaration(&mut self) -> ParseResult<Stmt> {

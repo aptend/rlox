@@ -1,4 +1,3 @@
-use std::cell::RefCell;
 use std::fmt;
 use std::rc::Rc;
 
@@ -23,20 +22,20 @@ pub trait LoxCallable: fmt::Debug {
 // Clonable trait object
 #[derive(Clone)]
 pub struct Callable {
-    inner: Rc<RefCell<Box<dyn LoxCallable>>>,
+    inner: Rc<Box<dyn LoxCallable>>,
 }
 
 impl Callable {
     pub fn new(callee: Box<dyn LoxCallable>) -> Callable {
         Callable {
-            inner: Rc::new(RefCell::new(callee)),
+            inner: Rc::new(callee),
         }
     }
 }
 
 impl LoxCallable for Callable {
     fn arity(&self) -> u8 {
-        self.inner.borrow().arity()
+        self.inner.arity()
     }
 
     fn call(
@@ -44,7 +43,7 @@ impl LoxCallable for Callable {
         interpreter: &mut Interpreter,
         args: Vec<Value>,
     ) -> RuntimeResult<Value> {
-        self.inner.borrow().call(interpreter, args)
+        self.inner.call(interpreter, args)
     }
 }
 
@@ -57,7 +56,7 @@ impl PartialEq for Callable {
 
 impl fmt::Debug for Callable {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{:?}", self.inner.borrow())
+        write!(f, "{:?}", self.inner)
     }
 }
 

@@ -12,6 +12,7 @@ pub enum RuntimeError {
     UndefinedProperty(BoxToken),
     NonCallable(BoxToken),
     NonInstanceGet(BoxToken),
+    NonClassSuper(BoxToken),
     // maxium argmument counts is 255, u8 is enough.
     ArityMismatch(BoxToken, u8, u8),
 
@@ -55,6 +56,10 @@ impl fmt::Display for RuntimeError {
             RuntimeError::NonInstanceGet(token) => {
                 write_position(f, token)?;
                 write!(f, "Only instances have properties.")
+            }
+            RuntimeError::NonClassSuper(token) => {
+                write_position(f, token)?;
+                write!(f, "Superclass must be a class.")
             }
             RuntimeError::ArityMismatch(token, expect, got) => {
                 write_position(f, token)?;

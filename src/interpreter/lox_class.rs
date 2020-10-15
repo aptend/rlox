@@ -1,11 +1,14 @@
-use super::{
-    Environment, Interpreter, LoxCallable, LoxFunction, RuntimeResult, Value,
-};
-use crate::ast::ClassStmt;
+use super::{Interpreter, LoxCallable, LoxFunction, RuntimeResult, Value};
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::fmt;
 use std::rc::Rc;
+
+pub struct ClassInner {
+    name: String,
+    superclass: Option<LoxClass>,
+    methods: HashMap<String, LoxFunction>,
+}
 
 #[derive(Clone)]
 pub struct LoxClass {
@@ -18,33 +21,36 @@ impl std::ops::Deref for LoxClass {
         &self.inner
     }
 }
-pub struct ClassInner {
-    name: String,
-    methods: HashMap<String, LoxFunction>,
+
+impl PartialEq for LoxClass {
+    fn eq(&self, other: &Self) -> bool {
+        Rc::ptr_eq(&self.inner, &other.inner)
+    }
 }
 
 impl LoxClass {
-    pub fn new(cls_stmt: &ClassStmt, env: Environment) -> Self {
-        let name = cls_stmt.name.as_str().unwrap().to_owned();
-
-        let methods = cls_stmt
-            .methods
-            .iter()
-            .map(|m| {
-                let name = m.name.as_str().unwrap().to_owned();
-                let lox_func =
-                    LoxFunction::new(m.clone(), env.clone(), name == "init");
-                (name, lox_func)
-            })
-            .collect();
+    pub fn new(
+        name: &str,
+        superclass: Option<LoxClass>,
+        methods: HashMap<String, LoxFunction>,
+    ) -> Self {
+        let name = name.to_owned();
 
         LoxClass {
-            inner: Rc::new(ClassInner { name, methods }),
+            inner: Rc::new(ClassInner {
+                name,
+                superclass,
+                methods,
+            }),
         }
     }
 
-    fn find_method(&self, name: &str) -> Option<&LoxFunction> {
-        self.methods.get(name)
+    pub(crate) fn find_method(&self, name: &str) -> Option<&LoxFunction> {
+        self.methods.get(name).or_else(|| {
+            self.superclass
+                .as_ref()
+                .and_then(|cls| cls.find_method(name))
+        })
     }
 }
 
@@ -126,8 +132,7 @@ impl fmt::Debug for LoxInstance {
 }
 
 impl PartialEq for LoxInstance {
-    fn eq(&self, _: &Self) -> bool {
-        // make compiler happy, we don't need this actually.
-        unimplemented!()
+    fn eq(&self, other: &Self) -> bool {
+        Rc::ptr_eq(&self.inner, &other.inner)
     }
 }

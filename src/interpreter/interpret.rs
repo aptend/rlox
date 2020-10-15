@@ -1,6 +1,6 @@
-use super::TokenKind;
 use super::{Interpreter, Value};
 use super::{RuntimeError, RuntimeResult};
+use super::{Token, TokenKind};
 use crate::ast::expr::*;
 
 use super::LoxCallable;
@@ -22,9 +22,41 @@ impl Interpret for Expr {
             Expr::Call(c) => c.interpret(interpreter),
             Expr::Get(g) => g.interpret(interpreter),
             Expr::Set(s) => s.interpret(interpreter),
+            Expr::Super(s) => s.interpret(interpreter),
             Expr::This(t) => {
                 interpreter.lookup_variable(&t.expr_key, &t.this_tk)
             }
+        }
+    }
+}
+
+impl Interpret for SuperExpr {
+    fn interpret(&self, interpreter: &mut Interpreter) -> RuntimeResult<Value> {
+        // find a method in superclass and bind it to the current instance
+
+        // wrong implementation will causes unwrap failed
+        let distance = interpreter.scopes_info.get(&self.expr_key).unwrap();
+        let superclass = interpreter.env.get_at(*distance, &self.super_tk)?;
+
+        let superclass = match superclass {
+            Value::Class(ref cls) => cls,
+            _ => panic!("invalid superclass value"),
+        };
+
+        match superclass.find_method(self.method.as_str().unwrap()) {
+            Some(func) => {
+                let instance = interpreter
+                    .env
+                    .get_at(*distance - 1, &Token::new_this())?;
+                let instance = match instance {
+                    Value::Instance(ref ins) => ins,
+                    _ => panic!("invalid instance value"),
+                };
+                Ok(Value::new_callable(Box::new(func.bind(instance.clone()))))
+            }
+            None => Err(RuntimeError::UndefinedProperty(Box::new(
+                self.method.clone(),
+            ))),
         }
     }
 }
@@ -59,25 +91,30 @@ impl Interpret for GetExpr {
 impl Interpret for CallExpr {
     fn interpret(&self, interpreter: &mut Interpreter) -> RuntimeResult<Value> {
         // check type
-        if let Value::Callable(callee) = self.callee.interpret(interpreter)? {
-            // check arity
-            let (expect, got) = (callee.arity(), self.arguments.len() as u8);
-            if expect != got {
-                return Err(RuntimeError::ArityMismatch(
-                    Box::new(self.pos_tk.clone()),
-                    expect,
-                    got,
-                ));
+        let value = self.callee.interpret(interpreter)?;
+        let callee = match value {
+            Value::Callable(ref call) => call as &dyn LoxCallable,
+            Value::Class(ref cls) => cls as &dyn LoxCallable,
+            _ => {
+                return Err(RuntimeError::NonCallable(Box::new(
+                    self.pos_tk.clone(),
+                )))
             }
-            // eval args and call
-            let mut args = Vec::new();
-            for arg in &self.arguments {
-                args.push(arg.interpret(interpreter)?);
-            }
-            callee.call(interpreter, args)
-        } else {
-            Err(RuntimeError::NonCallable(Box::new(self.pos_tk.clone())))
+        };
+        let (expect, got) = (callee.arity(), self.arguments.len() as u8);
+        if expect != got {
+            return Err(RuntimeError::ArityMismatch(
+                Box::new(self.pos_tk.clone()),
+                expect,
+                got,
+            ));
         }
+        // eval args and call
+        let mut args = Vec::new();
+        for arg in &self.arguments {
+            args.push(arg.interpret(interpreter)?);
+        }
+        callee.call(interpreter, args)
     }
 }
 

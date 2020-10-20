@@ -1,8 +1,7 @@
 use std::str;
 
-use super::token::*;
 use super::error::ScanError;
-
+use super::token::*;
 
 pub struct Scanner<'a> {
     // position
@@ -106,7 +105,10 @@ impl<'a> Scanner<'a> {
         self.advance_while(|c| c != '"');
         // stop because of eof
         if self.peek1.is_none() {
-            return Err(ScanError::new_unterminated_str(self.line, self.column));
+            return Err(ScanError::new_unterminated_str(
+                self.line,
+                self.column,
+            ));
         }
         // consume the trailing "
         self.advance();
@@ -179,7 +181,8 @@ impl<'a> std::iter::Iterator for Scanner<'a> {
     type Item = Result<Token, ScanError>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        let current_pos = Position::new(self.line, self.column);
+        // the begin position of a token
+        let (cur_line, cur_column) = (self.line, self.column);
         self.current_lexeme.clear();
         if let Some(ch) = self.advance() {
             let kind = match ch {
@@ -227,14 +230,18 @@ impl<'a> std::iter::Iterator for Scanner<'a> {
                 '"' => self.collect_string(),
                 c if is_digit(c) => self.collect_number(),
                 c if is_alpha(c) => self.collect_identifier(),
-                _ => Err(ScanError::new_unexpected_char(ch, self.line, self.column)),
+                _ => Err(ScanError::new_unexpected_char(
+                    ch,
+                    self.line,
+                    self.column,
+                )),
             };
 
             match kind {
                 // ignore whitespace and comments
                 Ok(TokenKind::SPACE) | Ok(TokenKind::COMMENT) => self.next(),
                 // find useful one
-                Ok(kind) => Some(Ok(Token::new(current_pos, kind))),
+                Ok(kind) => Some(Ok(Token::new(cur_line, cur_column, kind))),
                 Err(e) => Some(Err(e)),
             }
         } else {

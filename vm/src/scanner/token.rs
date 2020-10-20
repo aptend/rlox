@@ -1,6 +1,7 @@
 use std::fmt;
 use std::str;
 
+use crate::common::Position;
 
 #[derive(Clone, Debug)]
 #[allow(non_camel_case_types)]
@@ -62,26 +63,6 @@ impl std::cmp::PartialEq for TokenKind {
     }
 }
 
-
-#[derive(Clone, Copy, Eq, PartialEq, Default)]
-pub struct Position {
-    pub line: usize,
-    pub column: usize,
-}
-
-impl Position {
-    pub fn new(line: usize, column: usize) -> Position {
-        Position { line, column }
-    }
-}
-
-impl fmt::Display for Position {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "[line {}, column {}]", self.line, self.column)
-    }
-}
-
-
 #[derive(Clone)]
 pub struct Token {
     pub position: Position,
@@ -89,8 +70,11 @@ pub struct Token {
 }
 
 impl Token {
-    pub fn new(position: Position, kind: TokenKind) -> Token {
-        Token { position, kind }
+    pub fn new(line: usize, column: usize, kind: TokenKind) -> Token {
+        Token {
+            position: Position::new(line, column),
+            kind,
+        }
     }
 
     pub(crate) fn with_kind(kind: TokenKind) -> Token {
@@ -159,8 +143,7 @@ impl fmt::Display for Token {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match &self.kind {
             TokenKind::NUMBER(n) => write!(f, "{}", n),
-            _ => write!(f, "{}", self.as_str())
+            _ => write!(f, "{}", self.as_str()),
         }
     }
 }
-

@@ -36,7 +36,6 @@ fn run(source: &str) {
             Ok(tk) => println!("{}", tk),
             Err(err) => println!("{}", err),
         }
-        
     }
     // let mut parser = Parser::new(scanner);
     // let stmts = match parser.parse() {

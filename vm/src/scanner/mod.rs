@@ -1,7 +1,7 @@
+mod error;
 mod scan;
 mod token;
-mod error;
 
+pub use error::ScanError;
 pub use scan::Scanner;
 pub use token::{Token, TokenKind};
-pub use error::ScanError;

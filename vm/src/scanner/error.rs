@@ -1,6 +1,6 @@
 use std::fmt;
 
-use super::token::Position;
+use crate::common::Position;
 
 enum ErrorKind {
     UnexpectedChar(char),

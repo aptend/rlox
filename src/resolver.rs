@@ -21,7 +21,7 @@ enum FunctionType {
 enum ClassType {
     None,
     Class,
-    Subclass
+    Subclass,
 }
 
 // Let me try lifetime approach for Resolver
@@ -357,14 +357,14 @@ impl Resolve for Expr {
             Expr::Super(s) => {
                 match resolver.current_class {
                     ClassType::None => {
-                        resolver.errors.push(SyntaxError::SuperOutside(Box::new(
-                        s.super_tk.clone(),
-                    )));
+                        resolver.errors.push(SyntaxError::SuperOutside(
+                            Box::new(s.super_tk.clone()),
+                        ));
                     }
                     ClassType::Class => {
-                        resolver.errors.push(SyntaxError::SuperInNormalClass(Box::new(
-                        s.super_tk.clone(),
-                    )));
+                        resolver.errors.push(SyntaxError::SuperInNormalClass(
+                            Box::new(s.super_tk.clone()),
+                        ));
                     }
                     ClassType::Subclass => {
                         resolver.resolve_local(s.expr_key, "super");

@@ -92,6 +92,7 @@ impl Token {
         Token::with_kind(TokenKind::SUPER)
     }
 
+    /// TokenKind::Number will return "f64"
     pub fn as_str(&self) -> &str {
         match &self.kind {
             TokenKind::LEFT_PAREN => "(",

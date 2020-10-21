@@ -88,20 +88,18 @@ impl<'a> Compiler<'a> {
         }
     }
 
-    fn peek(&mut self) -> Option<&Token> {
+    fn peek(&mut self) -> Option<&TokenKind> {
         if self.peeked.is_none() {
             self.peeked = self.advance();
         }
-        self.peeked.as_ref()
+        self.peeked.as_ref().and_then(|t| Some(&t.kind))
     }
 
     fn peek_check<F: FnOnce(&TokenKind) -> bool>(&mut self, f: F) -> bool {
-        if let Some(tk) = self.peek() {
-            if f(&tk.kind) {
-                return true;
-            }
+        match self.peek() {
+            Some(tk) => f(tk),
+            None => false,
         }
-        false
     }
 
     fn advance_if_eq(&mut self, kind: &TokenKind) -> Option<Token> {
@@ -119,7 +117,7 @@ impl<'a> Compiler<'a> {
         if let Some(tk) = self.advance_if_eq(kind) {
             Ok(tk)
         } else {
-            Err(SyntaxError::new_compiler_err(self.peek().cloned(), msg))
+            Err(SyntaxError::new_compiler_err(self.peeked.clone(), msg))
         }
     }
 
@@ -153,7 +151,9 @@ impl<'a> Compiler<'a> {
 
     fn unary(&mut self) {
         let tk = self.advance().unwrap();
-        self.expression();
+        // compose those expressions with higher or equal level precedence,
+        // which means it is right-associated for unary comp
+        self.parse_with(Precedence::Unary);
         let instr = match &tk.kind {
             TokenKind::MINUS => Instruction::Negate,
             _ => unreachable!(),
@@ -161,13 +161,34 @@ impl<'a> Compiler<'a> {
         self.emit_instr(instr, tk.position);
     }
 
+    fn binary(&mut self) {
+        let tk = self.advance().unwrap();
+        // compose those expressions with higher level precedence
+        // which is left-associated
+        self.parse_with(Precedence::of(Some(&tk.kind)).next_prec());
+        let instr = match &tk.kind {
+            TokenKind::PLUS => Instruction::Add,
+            TokenKind::MINUS => Instruction::Subtract,
+            TokenKind::STAR => Instruction::Multiply,
+            TokenKind::SLASH => Instruction::Divide,
+            _ => unreachable!(),
+        };
+        self.emit_instr(instr, tk.position);
+    }
+
     fn parse_with(&mut self, prec: Precedence) {
         self.dispatch_prefix();
+        // Precedence::of is a 'flatterer' of Rust borrow checker.
+        // The reference returned by self.peek() holds &mut self, it
+        // can't be passed into a method like self.precedence_of(kind)
+        while prec <= Precedence::of(self.peek()) {
+            self.dispatch_infix();
+        }
     }
 
     // use match expression to mock a the prefix table
     fn dispatch_prefix(&mut self) {
-        match self.peek().and_then(|tk| Some(&tk.kind)) {
+        match self.peek() {
             Some(&TokenKind::NUMBER(_)) => self.constant(),
             Some(&TokenKind::LEFT_PAREN) => self.grouping(),
             Some(&TokenKind::MINUS) => self.unary(),
@@ -177,6 +198,16 @@ impl<'a> Compiler<'a> {
                     "Expect an expression.",
                 );
             }
+        }
+    }
+
+    fn dispatch_infix(&mut self) {
+        match self.peek() {
+            Some(&TokenKind::PLUS)
+            | Some(&TokenKind::MINUS)
+            | Some(&TokenKind::STAR)
+            | Some(&TokenKind::SLASH) => self.binary(),
+            _ => unreachable!(),
         }
     }
 

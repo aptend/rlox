@@ -1,4 +1,4 @@
-mod chunk;
+pub mod chunk;
 mod common;
 pub mod compiler;
 pub mod scanner;

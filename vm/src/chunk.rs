@@ -56,15 +56,14 @@ impl Chunk {
     }
 
     fn dis_instr(&self, offset: usize) {
-        if offset > 0
-            && self.positions[offset].line == self.positions[offset - 1].line
-        {
+        let line = self.positions[offset].line;
+        if offset > 0 && line == self.positions[offset - 1].line {
             println!("{:04}    | {}", offset, self.code[offset]);
+        } else if line == 0 {
+            // not instr from token, like the last return of vm
+            println!("{:04}    * {}", offset, self.code[offset]);
         } else {
-            println!(
-                "{:04} {:>4} {}",
-                offset, self.positions[offset].line, self.code[offset]
-            );
+            println!("{:04} {:>4} {}", offset, line, self.code[offset]);
         }
     }
 }

@@ -180,8 +180,8 @@ impl<'a> Compiler<'a> {
         }
     }
 
-
     pub fn compile(&mut self) {
+        self.expression();
         self.emit_return();
     }
 }

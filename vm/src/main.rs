@@ -2,8 +2,9 @@ use std::env;
 use std::fs::File;
 use std::io::{self, BufRead, BufReader, Read, Write};
 
-use vm::scanner::Scanner;
+use vm::chunk::Chunk;
 use vm::compiler::Compiler;
+use vm::scanner::Scanner;
 
 fn run_prompt() {
     let mut lines = BufReader::new(io::stdin()).lines();
@@ -32,12 +33,10 @@ fn run_file(filename: String) {
 
 fn run(source: &str) {
     let scanner = Scanner::new(source);
-    for token in scanner {
-        match token {
-            Ok(tk) => println!("{}", tk),
-            Err(err) => println!("{}", err),
-        }
-    }
+    let mut chunk = Chunk::new("test");
+    let mut compiler = Compiler::new(scanner, &mut chunk);
+    compiler.compile();
+    chunk.disassemble();
     // let mut parser = Parser::new(scanner);
     // let stmts = match parser.parse() {
     //     Ok(s) => s,

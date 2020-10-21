@@ -3,6 +3,7 @@ use std::fs::File;
 use std::io::{self, BufRead, BufReader, Read, Write};
 
 use vm::scanner::Scanner;
+use vm::compiler::Compiler;
 
 fn run_prompt() {
     let mut lines = BufReader::new(io::stdin()).lines();

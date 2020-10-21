@@ -1,9 +1,13 @@
 use super::error::SyntaxError;
 use crate::chunk::*;
-use crate::common::Position;
+use crate::common::{Position, Value};
 use crate::scanner::*;
 
+use super::prec::Precedence;
+
 use lazy_static::lazy_static;
+
+type CompileResult<T> = Result<T, SyntaxError>;
 
 lazy_static! {
     static ref LEFT_PAREN: TokenKind = TokenKind::LEFT_PAREN;
@@ -47,7 +51,6 @@ lazy_static! {
     static ref VAR: TokenKind = TokenKind::VAR;
     static ref WHILE: TokenKind = TokenKind::WHILE;
     static ref BREAK: TokenKind = TokenKind::BREAK;
-    static ref EOF: TokenKind = TokenKind::EOF;
 }
 
 pub struct Compiler<'a> {
@@ -101,10 +104,84 @@ impl<'a> Compiler<'a> {
         false
     }
 
+    fn advance_if_eq(&mut self, kind: &TokenKind) -> Option<Token> {
+        if self.peek_check(|k| k == kind) {
+            return self.advance();
+        }
+        None
+    }
+
+    fn consume_or_err(
+        &mut self,
+        kind: &TokenKind,
+        msg: &str,
+    ) -> CompileResult<Token> {
+        if let Some(tk) = self.advance_if_eq(kind) {
+            Ok(tk)
+        } else {
+            Err(SyntaxError::new_compiler_err(self.peek().cloned(), msg))
+        }
+    }
+
     fn emit_return(&mut self) {
         self.chunk
             .push_instr(Instruction::Return, Position::default());
     }
 
-    pub fn compile() {}
+    fn emit_instr(&mut self, instr: Instruction, pos: Position) {
+        self.chunk.push_instr(instr, pos);
+    }
+
+    fn expression(&mut self) {
+        self.parse_with(Precedence::Assign);
+    }
+
+    fn grouping(&mut self) {
+        self.advance(); // skip '('
+        self.expression();
+        self.consume_or_err(&RIGHT_PAREN, "Expect ')' after expression.");
+    }
+
+    fn constant(&mut self) {
+        let tk = self.advance().unwrap();
+        let value = match &tk.kind {
+            TokenKind::NUMBER(f) => Value::Number(*f),
+            _ => unimplemented!(),
+        };
+        self.emit_instr(Instruction::LoadConstant(value), tk.position);
+    }
+
+    fn unary(&mut self) {
+        let tk = self.advance().unwrap();
+        self.expression();
+        let instr = match &tk.kind {
+            TokenKind::MINUS => Instruction::Negate,
+            _ => unreachable!(),
+        };
+        self.emit_instr(instr, tk.position);
+    }
+
+    fn parse_with(&mut self, prec: Precedence) {
+        self.dispatch_prefix();
+    }
+
+    // use match expression to mock a the prefix table
+    fn dispatch_prefix(&mut self) {
+        match self.peek().and_then(|tk| Some(&tk.kind)) {
+            Some(&TokenKind::NUMBER(_)) => self.constant(),
+            Some(&TokenKind::LEFT_PAREN) => self.grouping(),
+            Some(&TokenKind::MINUS) => self.unary(),
+            _ => {
+                SyntaxError::new_compiler_err(
+                    self.advance(),
+                    "Expect an expression.",
+                );
+            }
+        }
+    }
+
+
+    pub fn compile(&mut self) {
+        self.emit_return();
+    }
 }

@@ -1,7 +1,6 @@
-use super::value::Value;
-use crate::chunk::{Chunk, Constant, Instruction};
+use crate::chunk::{Chunk, Instruction};
 
-use crate::common::Position;
+use crate::common::{Position, Value};
 
 pub struct RunningMachine<'a> {
     code: &'a [Instruction],
@@ -35,7 +34,7 @@ impl<'a> RunningMachine<'a> {
                 Instruction::Negate => match self.pop() {
                     Value::Number(f) => self.push(Value::Number(-f)),
                 },
-                Instruction::LoadConstant(c) => self.push(c.into()),
+                Instruction::LoadConstant(c) => self.push(c.clone()),
                 Instruction::Add => binary_op!(+),
                 Instruction::Subtract => binary_op!(-),
                 Instruction::Multiply => binary_op!(*),

@@ -3,7 +3,7 @@ use std::fmt;
 use crate::scanner::{ScanError, Token};
 pub struct CompileError {
     msg: String,
-    token: Token,
+    token: Option<Token>,
 }
 
 pub enum SyntaxError {
@@ -12,7 +12,7 @@ pub enum SyntaxError {
 }
 
 impl SyntaxError {
-    pub fn new_compiler_err(token: Token, msg: &str) -> SyntaxError {
+    pub fn new_compiler_err(token: Option<Token>, msg: &str) -> SyntaxError {
         SyntaxError::CompileError(CompileError {
             msg: msg.to_owned(),
             token,
@@ -31,13 +31,20 @@ impl fmt::Display for SyntaxError {
 
 impl fmt::Display for CompileError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(
-            f,
-            "{} SyntaxError at '{}': {}",
-            self.token.position,
-            self.token.as_str(),
-            self.msg
-        )
+        match &self.token {
+            Some(tk) => write!(
+                f,
+                "{} SyntaxError at '{}': {}",
+                tk.position,
+                tk.as_str(),
+                self.msg
+            ),
+            None => write!(
+                f,
+                "[the last line] SyntaxError at the end: {}",
+                self.msg
+            ),
+        }
     }
 }
 

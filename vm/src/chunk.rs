@@ -1,27 +1,15 @@
 use std::fmt;
 
-use crate::common::Position;
+use crate::common::{Position, Value};
 
 pub enum Instruction {
-    LoadConstant(Constant),
+    LoadConstant(Value),
     Negate,
     Add,
     Subtract,
     Multiply,
     Divide,
     Return,
-}
-
-pub enum Constant {
-    Number(f64),
-}
-
-impl fmt::Display for Constant {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Constant::Number(v) => write!(f, "{:?}", v),
-        }
-    }
 }
 
 impl fmt::Display for Instruction {
@@ -88,11 +76,11 @@ mod test {
     fn test_dis() {
         let mut chunk = Chunk::new("test program");
         chunk.push_instr(
-            Instruction::LoadConstant(Constant::Number(1.2)),
+            Instruction::LoadConstant(Value::Number(1.2)),
             Position::new(123, 1),
         );
         chunk.push_instr(
-            Instruction::LoadConstant(Constant::Number(3.2)),
+            Instruction::LoadConstant(Value::Number(3.2)),
             Position::new(123, 9),
         );
 

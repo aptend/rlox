@@ -3,6 +3,7 @@ use crate::scanner::TokenKind;
 pub enum Precedence {
     None,
     Assign,  // =
+    Ternary, // ? :
     Or,      // or
     And,     // and
     Equal,   // ==
@@ -24,6 +25,7 @@ impl Precedence {
             Some(&TokenKind::DOT) | Some(TokenKind::LEFT_PAREN) => {
                 Precedence::Call
             }
+            Some(&TokenKind::QUESTION) => Precedence::Ternary,
             _ => Precedence::None,
         }
     }
@@ -31,7 +33,8 @@ impl Precedence {
     pub fn next_prec(&self) -> Self {
         match self {
             Precedence::None => Precedence::Assign,
-            Precedence::Assign => Precedence::Or,
+            Precedence::Assign => Precedence::Ternary,
+            Precedence::Ternary => Precedence::Or,
             Precedence::Or => Precedence::And,
             Precedence::And => Precedence::Equal,
             Precedence::Equal => Precedence::Compare,

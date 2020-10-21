@@ -20,7 +20,8 @@ impl<'a> RunningMachine<'a> {
         macro_rules! binary_op {
             ($op: tt) => {
                 match (self.pop(), self.pop()) {
-                    (Value::Number(a), Value::Number(b)) => self.push(Value::Number(b $op a))
+                    (Value::Number(a), Value::Number(b)) => self.push(Value::Number(b $op a)),
+                    _ => unimplemented!()
                 }
             };
         }
@@ -33,12 +34,24 @@ impl<'a> RunningMachine<'a> {
                 }
                 Instruction::Negate => match self.pop() {
                     Value::Number(f) => self.push(Value::Number(-f)),
+                    _ => panic!("TypeError for OP_Negate."),
+                    
                 },
                 Instruction::LoadConstant(c) => self.push(c.clone()),
                 Instruction::Add => binary_op!(+),
                 Instruction::Subtract => binary_op!(-),
                 Instruction::Multiply => binary_op!(*),
                 Instruction::Divide => binary_op!(/),
+                Instruction::Ternary => {
+                    let left = self.pop();
+                    let right = self.pop();
+                    if self.pop().is_truthy() {
+                        self.push(left);
+                    } else {
+                        self.push(right);
+                    }
+
+                }
             }
         }
     }

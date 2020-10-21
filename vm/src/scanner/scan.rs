@@ -197,6 +197,8 @@ impl<'a> std::iter::Iterator for Scanner<'a> {
                 '+' => Ok(TokenKind::PLUS),
                 ';' => Ok(TokenKind::SEMICOLON),
                 '*' => Ok(TokenKind::STAR),
+                '?' => Ok(TokenKind::QUESTION),
+                ':' => Ok(TokenKind::COLON),
                 '/' => {
                     if self.advance_if_eq('/') {
                         self.advance_while(|c| c != '\n');

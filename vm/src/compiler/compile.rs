@@ -51,6 +51,8 @@ lazy_static! {
     static ref VAR: TokenKind = TokenKind::VAR;
     static ref WHILE: TokenKind = TokenKind::WHILE;
     static ref BREAK: TokenKind = TokenKind::BREAK;
+    static ref QUESTION: TokenKind = TokenKind::QUESTION;
+    static ref COLON: TokenKind = TokenKind::COLON;
 }
 
 pub struct Compiler<'a> {
@@ -176,6 +178,14 @@ impl<'a> Compiler<'a> {
         self.emit_instr(instr, tk.position);
     }
 
+    fn ternary(&mut self) {
+        let tk = self.advance().unwrap();
+        self.expression();
+        self.consume_or_err(&COLON, "Expect ':' in ternary expression");
+        self.expression();
+        self.emit_instr(Instruction::Ternary, tk.position);
+    }
+
     fn parse_with(&mut self, prec: Precedence) {
         self.dispatch_prefix();
         // Precedence::of is a 'flatterer' of Rust borrow checker.
@@ -207,6 +217,7 @@ impl<'a> Compiler<'a> {
             | Some(&TokenKind::MINUS)
             | Some(&TokenKind::STAR)
             | Some(&TokenKind::SLASH) => self.binary(),
+            Some(&TokenKind::QUESTION) => self.ternary(),
             _ => unreachable!(),
         }
     }

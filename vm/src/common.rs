@@ -20,13 +20,26 @@ impl fmt::Display for Position {
 
 #[derive(Debug, Clone)]
 pub enum Value {
+    Nil,
     Number(f64),
+    Boolean(bool),
 }
 
 impl fmt::Display for Value {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Value::Number(n) => write!(f, "{}", n),
+            Value::Nil => write!(f, "nil"),
+            Value::Boolean(b) => write!(f, "{}", b),
+        }
+    }
+}
+
+impl Value {
+    pub fn is_truthy(&self) -> bool {
+        match self {
+            Value::Nil | Value::Boolean(false) => false,
+            _ => true,
         }
     }
 }

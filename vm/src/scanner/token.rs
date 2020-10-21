@@ -53,7 +53,10 @@ pub enum TokenKind {
     TRUE,
     VAR,
     WHILE,
+    // challenges for break and tenary ? :
     BREAK,
+    QUESTION,
+    COLON,
 }
 
 impl std::cmp::PartialEq for TokenKind {
@@ -136,6 +139,8 @@ impl Token {
             TokenKind::VAR => "var",
             TokenKind::WHILE => "while",
             TokenKind::BREAK => "break",
+            TokenKind::QUESTION => "?",
+            TokenKind::COLON => ":",
         }
     }
 }

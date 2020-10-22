@@ -55,8 +55,9 @@ impl<'a> Machine<'a> {
                 Instruction::Multiply => binary_op!(*),
                 Instruction::Divide => binary_op!(/),
                 Instruction::Ternary => {
-                    let left = self.pop();
+                    // TODO: jump execution
                     let right = self.pop();
+                    let left = self.pop();
                     if self.pop().is_truthy() {
                         self.push(left);
                     } else {

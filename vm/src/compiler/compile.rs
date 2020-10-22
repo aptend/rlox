@@ -189,9 +189,12 @@ impl<'a> Compiler<'a> {
 
     fn ternary(&mut self) -> CompileResult<()> {
         let tk = self.advance().unwrap();
-        self.expression()?;
+        // right-associated:
+        // 1>0?10:20?100:101 will expand to 1>0? 10 : (20?100:101) = 10
+        // and we don't want this: cond ? A=foo : B=bar
+        self.parse_with(Precedence::Ternary)?;
         self.consume_or_err(&COLON, "Expect ':' in ternary expression")?;
-        self.expression()?;
+        self.parse_with(Precedence::Ternary)?;
         self.emit_instr(Instruction::Ternary, tk.position)
     }
 

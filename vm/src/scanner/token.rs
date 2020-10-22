@@ -80,6 +80,7 @@ impl Token {
         }
     }
 
+    #[allow(unused)]
     pub(crate) fn with_kind(kind: TokenKind) -> Token {
         Token {
             position: Position::default(),
@@ -87,11 +88,11 @@ impl Token {
         }
     }
 
-    pub(crate) fn new_this() -> Token {
+    pub(crate) fn _new_this() -> Token {
         Token::with_kind(TokenKind::THIS)
     }
 
-    pub(crate) fn new_super() -> Token {
+    pub(crate) fn _new_super() -> Token {
         Token::with_kind(TokenKind::SUPER)
     }
 

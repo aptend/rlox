@@ -44,28 +44,10 @@ fn run(source: &str) {
         }
     };
     chunk.disassemble();
-    let mut vm = Machine::new(&chunk.code);
-    vm.run();
-    // let mut parser = Parser::new(scanner);
-    // let stmts = match parser.parse() {
-    //     Ok(s) => s,
-    //     Err(ref errs) => {
-    //         for e in errs {
-    //             println!("{}", e);
-    //         }
-    //         return;
-    //     }
-    // };
-    // let mut resolver = Resolver::new(interpreter);
-    // if let Err(errs) = resolver.resolve(&stmts) {
-    //     for e in errs {
-    //         println!("{}", e);
-    //     }
-    //     return;
-    // }
-    // if let Err(ref e) = interpreter.interpret(&stmts) {
-    //     println!("{}", e);
-    // }
+    let mut vm = Machine::new(&chunk);
+    if let Err(ref e) = vm.run() {
+        println!("{}", e);
+    }
 }
 
 fn main() {

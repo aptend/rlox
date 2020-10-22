@@ -35,7 +35,6 @@ impl<'a> RunningMachine<'a> {
                 Instruction::Negate => match self.pop() {
                     Value::Number(f) => self.push(Value::Number(-f)),
                     _ => panic!("TypeError for OP_Negate."),
-                    
                 },
                 Instruction::LoadConstant(c) => self.push(c.clone()),
                 Instruction::Add => binary_op!(+),
@@ -50,7 +49,6 @@ impl<'a> RunningMachine<'a> {
                     } else {
                         self.push(right);
                     }
-
                 }
             }
         }

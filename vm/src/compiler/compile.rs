@@ -59,16 +59,16 @@ pub struct Compiler<'a> {
     errors: Vec<SyntaxError>,
     peeked: Option<Token>,
     tokens: Scanner<'a>,
-    chunk: &'a mut Chunk,
+    chunk: Chunk,
 }
 
 impl<'a> Compiler<'a> {
-    pub fn new(scanner: Scanner<'a>, chunk: &'a mut Chunk) -> Compiler<'a> {
+    pub fn new(scanner: Scanner<'a>, program_name: &str) -> Compiler<'a> {
         Compiler {
             errors: Vec::new(),
             peeked: None,
             tokens: scanner,
-            chunk,
+            chunk: Chunk::new(program_name),
         }
     }
 
@@ -123,51 +123,60 @@ impl<'a> Compiler<'a> {
         }
     }
 
-    fn emit_return(&mut self) {
-        self.chunk
-            .push_instr(Instruction::Return, Position::default());
+    fn emit_return(&mut self, pos: Option<Position>) {
+        let pos = match pos {
+            Some(p) => p,
+            None => Position::default(),
+        };
+        self.chunk.push_instr(Instruction::Return, pos);
     }
 
-    fn emit_instr(&mut self, instr: Instruction, pos: Position) {
+    fn emit_instr(
+        &mut self,
+        instr: Instruction,
+        pos: Position,
+    ) -> CompileResult<()> {
         self.chunk.push_instr(instr, pos);
+        Ok(())
     }
 
-    fn expression(&mut self) {
-        self.parse_with(Precedence::Assign);
+    fn expression(&mut self) -> CompileResult<()> {
+        self.parse_with(Precedence::Assign)
     }
 
-    fn grouping(&mut self) {
+    fn grouping(&mut self) -> CompileResult<()> {
         self.advance(); // skip '('
-        self.expression();
-        self.consume_or_err(&RIGHT_PAREN, "Expect ')' after expression.");
+        self.expression()?;
+        self.consume_or_err(&RIGHT_PAREN, "Expect ')' after expression.")
+            .and(Ok(()))
     }
 
-    fn constant(&mut self) {
+    fn constant(&mut self) -> CompileResult<()> {
         let tk = self.advance().unwrap();
         let value = match &tk.kind {
             TokenKind::NUMBER(f) => Value::Number(*f),
             _ => unimplemented!(),
         };
-        self.emit_instr(Instruction::LoadConstant(value), tk.position);
+        self.emit_instr(Instruction::LoadConstant(value), tk.position)
     }
 
-    fn unary(&mut self) {
+    fn unary(&mut self) -> CompileResult<()> {
         let tk = self.advance().unwrap();
         // compose those expressions with higher or equal level precedence,
         // which means it is right-associated for unary comp
-        self.parse_with(Precedence::Unary);
+        self.parse_with(Precedence::Unary)?;
         let instr = match &tk.kind {
             TokenKind::MINUS => Instruction::Negate,
             _ => unreachable!(),
         };
-        self.emit_instr(instr, tk.position);
+        self.emit_instr(instr, tk.position)
     }
 
-    fn binary(&mut self) {
+    fn binary(&mut self) -> CompileResult<()> {
         let tk = self.advance().unwrap();
         // compose those expressions with higher level precedence
         // which is left-associated
-        self.parse_with(Precedence::of(Some(&tk.kind)).next_prec());
+        self.parse_with(Precedence::of(Some(&tk.kind)).next_prec())?;
         let instr = match &tk.kind {
             TokenKind::PLUS => Instruction::Add,
             TokenKind::MINUS => Instruction::Subtract,
@@ -175,43 +184,42 @@ impl<'a> Compiler<'a> {
             TokenKind::SLASH => Instruction::Divide,
             _ => unreachable!(),
         };
-        self.emit_instr(instr, tk.position);
+        self.emit_instr(instr, tk.position)
     }
 
-    fn ternary(&mut self) {
+    fn ternary(&mut self) -> CompileResult<()> {
         let tk = self.advance().unwrap();
-        self.expression();
-        self.consume_or_err(&COLON, "Expect ':' in ternary expression");
-        self.expression();
-        self.emit_instr(Instruction::Ternary, tk.position);
+        self.expression()?;
+        self.consume_or_err(&COLON, "Expect ':' in ternary expression")?;
+        self.expression()?;
+        self.emit_instr(Instruction::Ternary, tk.position)
     }
 
-    fn parse_with(&mut self, prec: Precedence) {
-        self.dispatch_prefix();
+    fn parse_with(&mut self, prec: Precedence) -> CompileResult<()> {
+        self.dispatch_prefix()?;
         // Precedence::of is a 'flatterer' of Rust borrow checker.
         // The reference returned by self.peek() holds &mut self, it
         // can't be passed into a method like self.precedence_of(kind)
         while prec <= Precedence::of(self.peek()) {
-            self.dispatch_infix();
+            self.dispatch_infix()?;
         }
+        Ok(())
     }
 
     // use match expression to mock a the prefix table
-    fn dispatch_prefix(&mut self) {
+    fn dispatch_prefix(&mut self) -> CompileResult<()> {
         match self.peek() {
             Some(&TokenKind::NUMBER(_)) => self.constant(),
             Some(&TokenKind::LEFT_PAREN) => self.grouping(),
             Some(&TokenKind::MINUS) => self.unary(),
-            _ => {
-                SyntaxError::new_compiler_err(
-                    self.advance(),
-                    "Expect an expression.",
-                );
-            }
+            _ => Err(SyntaxError::new_compiler_err(
+                self.advance(),
+                "Expect an expression.",
+            )),
         }
     }
 
-    fn dispatch_infix(&mut self) {
+    fn dispatch_infix(&mut self) -> CompileResult<()> {
         match self.peek() {
             Some(&TokenKind::PLUS)
             | Some(&TokenKind::MINUS)
@@ -222,8 +230,44 @@ impl<'a> Compiler<'a> {
         }
     }
 
-    pub fn compile(&mut self) {
-        self.expression();
-        self.emit_return();
+    fn synchronize(&mut self) {
+        loop {
+            if let Some(kind) = self.peek() {
+                match kind {
+                    TokenKind::SEMICOLON => {
+                        self.advance();
+                        return;
+                    }
+                    TokenKind::CLASS
+                    | TokenKind::FUN
+                    | TokenKind::VAR
+                    | TokenKind::FOR
+                    | TokenKind::IF
+                    | TokenKind::WHILE
+                    | TokenKind::PRINT
+                    | TokenKind::RETURN => return,
+                    _ => {
+                        self.advance();
+                    }
+                }
+            } else {
+                break;
+            }
+        }
+    }
+
+    pub fn compile(&mut self) -> Result<Chunk, Vec<SyntaxError>> {
+        while self.peek().is_some() {
+            if let Err(e) = self.expression() {
+                self.errors.push(e);
+                self.synchronize();
+            }
+        }
+        if self.errors.is_empty() {
+            self.emit_return(None);
+            Ok(std::mem::take(&mut self.chunk))
+        } else {
+            Err(std::mem::take(&mut self.errors))
+        }
     }
 }

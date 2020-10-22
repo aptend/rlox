@@ -33,10 +33,16 @@ fn run_file(filename: String) {
 
 fn run(source: &str) {
     let scanner = Scanner::new(source);
-    let mut chunk = Chunk::new("test");
-    let mut compiler = Compiler::new(scanner, &mut chunk);
-    compiler.compile();
-    chunk.disassemble();
+    let mut compiler = Compiler::new(scanner, "EVA-01 Test Type");
+    match compiler.compile() {
+        Ok(ref chunk) => chunk.disassemble(),
+        Err(ref errs) => {
+            for err in errs {
+                println!("{}", err);
+            }
+            return;
+        }
+    }
     // let mut parser = Parser::new(scanner);
     // let stmts = match parser.parse() {
     //     Ok(s) => s,

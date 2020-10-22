@@ -30,6 +30,7 @@ impl fmt::Display for Instruction {
     }
 }
 
+#[derive(Default)]
 pub struct Chunk {
     pub name: String,
     pub code: Vec<Instruction>,

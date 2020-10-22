@@ -178,6 +178,7 @@ impl<'a> Compiler<'a> {
         self.parse_with(Precedence::Unary)?;
         let instr = match &tk.kind {
             TokenKind::MINUS => Instruction::Negate,
+            TokenKind::BANG => Instruction::Not,
             _ => unreachable!(),
         };
         self.emit_instr(instr, tk.position)
@@ -226,6 +227,7 @@ impl<'a> Compiler<'a> {
             Some(&TokenKind::NUMBER(_)) => self.constant(),
             Some(&TokenKind::LEFT_PAREN) => self.grouping(),
             Some(&TokenKind::MINUS) => self.unary(),
+            Some(&TokenKind::BANG) => self.unary(),
             Some(&TokenKind::NIL) => self.literal(),
             Some(&TokenKind::TRUE) => self.literal(),
             Some(&TokenKind::FALSE) => self.literal(),

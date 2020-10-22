@@ -13,6 +13,7 @@ pub enum Instruction {
     Nil,
     False,
     True,
+    Not,
     Return,
 }
 
@@ -23,6 +24,7 @@ impl fmt::Display for Instruction {
                 write!(f, "{:20} {}", "OP_LoadConstant", c)
             }
             Instruction::Negate => write!(f, "OP_Negate"),
+            Instruction::Not => write!(f, "OP_Not"),
             Instruction::Add => write!(f, "OP_Add"),
             Instruction::Subtract => write!(f, "OP_Subtract"),
             Instruction::Multiply => write!(f, "OP_Multiply"),

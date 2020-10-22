@@ -70,6 +70,10 @@ impl<'a> Machine<'a> {
                     Value::Number(f) => self.push(Value::Number(-f)),
                     _ => return self.runtime_err("Operand must be a number."),
                 },
+                Instruction::Not => {
+                    let val = !self.pop().is_truthy();
+                    self.push(Value::Boolean(val))
+                }
                 Instruction::LoadConstant(c) => self.push(c.clone()),
                 Instruction::Nil => self.push(Value::Nil),
                 Instruction::True => self.push(Value::Boolean(true)),

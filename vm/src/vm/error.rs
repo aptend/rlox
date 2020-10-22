@@ -16,8 +16,7 @@ impl RuntimeError {
     pub fn new(pos: Position, msg: &str) -> Self {
         RuntimeError {
             msg: msg.to_string(),
-            pos
+            pos,
         }
     }
 }
-

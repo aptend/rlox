@@ -18,7 +18,7 @@ impl fmt::Display for Position {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum Value {
     Nil,
     Number(f64),

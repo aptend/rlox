@@ -25,6 +25,13 @@ impl Precedence {
             Some(&TokenKind::DOT) | Some(TokenKind::LEFT_PAREN) => {
                 Precedence::Call
             }
+            Some(&TokenKind::EQUAL_EQUAL) | Some(&TokenKind::BANG_EQUAL) => {
+                Precedence::Equal
+            }
+            Some(&TokenKind::GREATER)
+            | Some(&TokenKind::GREATER_EQUAL)
+            | Some(&TokenKind::LESS)
+            | Some(&TokenKind::LESS_EQUAL) => Precedence::Equal,
             Some(&TokenKind::QUESTION) => Precedence::Ternary,
             _ => Precedence::None,
         }

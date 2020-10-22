@@ -1,6 +1,6 @@
 use crate::chunk::{Chunk, Instruction};
-use crate::common::Value;
 use crate::common::Position;
+use crate::common::Value;
 
 use super::error::RuntimeError;
 
@@ -32,7 +32,6 @@ impl<'a> Machine<'a> {
         self.stack.push(value);
     }
 
-    
     fn _peek_at(&self, distance: usize) -> &Value {
         let idx = self.stack.len() - distance - 1;
         &self.stack[idx]
@@ -43,7 +42,7 @@ impl<'a> Machine<'a> {
     }
 
     fn runtime_err(&self, msg: &str) -> VmResult<()> {
-        let pos = self.positions[self.ip-1];
+        let pos = self.positions[self.ip - 1];
         Err(RuntimeError::new(pos, msg))
     }
 
@@ -51,14 +50,16 @@ impl<'a> Machine<'a> {
         // TODO: check_value_on_stack.or_else(raise RuntimeError)
         //       before popping it from stack, like the book did
         macro_rules! binary_op {
-            ($op: tt) => {
+            ($typ: tt, $op: tt) => {
                 match (self.pop(), self.pop()) {
-                    (Value::Number(a), Value::Number(b)) => self.push(Value::Number(b $op a)),
+                    (Value::Number(a), Value::Number(b)) => self.push(Value::$typ(b $op a)),
                     _ => return self.runtime_err("Operands must be numbers."),
                 }
             }
         }
         loop {
+            // for debug
+            // println!("{:?}", self.stack);
             let instr = &self.code[self.ip];
             self.ip += 1;
             match instr {
@@ -78,10 +79,16 @@ impl<'a> Machine<'a> {
                 Instruction::Nil => self.push(Value::Nil),
                 Instruction::True => self.push(Value::Boolean(true)),
                 Instruction::False => self.push(Value::Boolean(false)),
-                Instruction::Add => binary_op!(+),
-                Instruction::Subtract => binary_op!(-),
-                Instruction::Multiply => binary_op!(*),
-                Instruction::Divide => binary_op!(/),
+                Instruction::Add => binary_op!(Number, +),
+                Instruction::Subtract => binary_op!(Number, -),
+                Instruction::Multiply => binary_op!(Number, *),
+                Instruction::Divide => binary_op!(Number, /),
+                Instruction::Less => binary_op!(Boolean, <),
+                Instruction::Greater => binary_op!(Boolean, >),
+                Instruction::Equal => {
+                    let (a, b) = (self.pop(), self.pop());
+                    self.push(Value::Boolean(a == b))
+                }
                 Instruction::Ternary => {
                     // TODO: jump execution
                     let right = self.pop();

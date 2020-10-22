@@ -5,15 +5,21 @@ use crate::common::{Position, Value};
 pub enum Instruction {
     LoadConstant(Value),
     Negate,
+    Not,
+
     Add,
     Subtract,
     Multiply,
     Divide,
+    Equal,
+    Less,
+    Greater,
     Ternary,
+
     Nil,
     False,
     True,
-    Not,
+
     Return,
 }
 
@@ -29,6 +35,9 @@ impl fmt::Display for Instruction {
             Instruction::Subtract => write!(f, "OP_Subtract"),
             Instruction::Multiply => write!(f, "OP_Multiply"),
             Instruction::Divide => write!(f, "OP_Divide"),
+            Instruction::Equal => write!(f, "OP_Equal"),
+            Instruction::Less => write!(f, "OP_Less"),
+            Instruction::Greater => write!(f, "OP_Greater"),
             Instruction::Ternary => write!(f, "OP_Ternary"),
             Instruction::Nil => write!(f, "OP_LoadNil"),
             Instruction::True => write!(f, "OP_LoadTrue"),

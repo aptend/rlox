@@ -194,9 +194,22 @@ impl<'a> Compiler<'a> {
             TokenKind::MINUS => Instruction::Subtract,
             TokenKind::STAR => Instruction::Multiply,
             TokenKind::SLASH => Instruction::Divide,
+            TokenKind::EQUAL_EQUAL => Instruction::Equal,
+            TokenKind::BANG_EQUAL => Instruction::Equal,
+            TokenKind::LESS => Instruction::Less,
+            TokenKind::LESS_EQUAL => Instruction::Greater,
+            TokenKind::GREATER => Instruction::Greater,
+            TokenKind::GREATER_EQUAL => Instruction::Less,
             _ => unreachable!(),
         };
-        self.emit_instr(instr, tk.position)
+        self.emit_instr(instr, tk.position)?;
+        if &tk.kind == &*LESS_EQUAL
+            || &tk.kind == &*GREATER_EQUAL
+            || &tk.kind == &*BANG_EQUAL
+        {
+            self.emit_instr(Instruction::Not, tk.position)?;
+        }
+        Ok(())
     }
 
     fn ternary(&mut self) -> CompileResult<()> {
@@ -243,7 +256,13 @@ impl<'a> Compiler<'a> {
             Some(&TokenKind::PLUS)
             | Some(&TokenKind::MINUS)
             | Some(&TokenKind::STAR)
-            | Some(&TokenKind::SLASH) => self.binary(),
+            | Some(&TokenKind::SLASH)
+            | Some(&TokenKind::LESS)
+            | Some(&TokenKind::LESS_EQUAL)
+            | Some(&TokenKind::EQUAL_EQUAL)
+            | Some(&TokenKind::BANG_EQUAL)
+            | Some(&TokenKind::GREATER)
+            | Some(&TokenKind::GREATER_EQUAL) => self.binary(),
             Some(&TokenKind::QUESTION) => self.ternary(),
             _ => unreachable!(),
         }

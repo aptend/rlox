@@ -10,6 +10,9 @@ pub enum Instruction {
     Multiply,
     Divide,
     Ternary,
+    Nil,
+    False,
+    True,
     Return,
 }
 
@@ -25,6 +28,9 @@ impl fmt::Display for Instruction {
             Instruction::Multiply => write!(f, "OP_Multiply"),
             Instruction::Divide => write!(f, "OP_Divide"),
             Instruction::Ternary => write!(f, "OP_Ternary"),
+            Instruction::Nil => write!(f, "OP_LoadNil"),
+            Instruction::True => write!(f, "OP_LoadTrue"),
+            Instruction::False => write!(f, "OP_LoadFalse"),
             Instruction::Return => write!(f, "OP_Return"),
         }
     }

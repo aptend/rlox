@@ -160,6 +160,17 @@ impl<'a> Compiler<'a> {
         self.emit_instr(Instruction::LoadConstant(value), tk.position)
     }
 
+    fn literal(&mut self) -> CompileResult<()> {
+        let tk = self.advance().unwrap();
+        let instr = match &tk.kind {
+            TokenKind::NIL => Instruction::Nil,
+            TokenKind::TRUE => Instruction::True,
+            TokenKind::FALSE => Instruction::False,
+            _ => unimplemented!(),
+        };
+        self.emit_instr(instr, tk.position)
+    }
+
     fn unary(&mut self) -> CompileResult<()> {
         let tk = self.advance().unwrap();
         // compose those expressions with higher or equal level precedence,
@@ -215,6 +226,9 @@ impl<'a> Compiler<'a> {
             Some(&TokenKind::NUMBER(_)) => self.constant(),
             Some(&TokenKind::LEFT_PAREN) => self.grouping(),
             Some(&TokenKind::MINUS) => self.unary(),
+            Some(&TokenKind::NIL) => self.literal(),
+            Some(&TokenKind::TRUE) => self.literal(),
+            Some(&TokenKind::FALSE) => self.literal(),
             _ => Err(SyntaxError::new_compiler_err(
                 self.advance(),
                 "Expect an expression.",

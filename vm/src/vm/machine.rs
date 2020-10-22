@@ -48,6 +48,8 @@ impl<'a> Machine<'a> {
     }
 
     pub fn run(&mut self) -> VmResult<()> {
+        // TODO: check_value_on_stack.or_else(raise RuntimeError)
+        //       before popping it from stack, like the book did
         macro_rules! binary_op {
             ($op: tt) => {
                 match (self.pop(), self.pop()) {
@@ -69,6 +71,9 @@ impl<'a> Machine<'a> {
                     _ => return self.runtime_err("Operand must be a number."),
                 },
                 Instruction::LoadConstant(c) => self.push(c.clone()),
+                Instruction::Nil => self.push(Value::Nil),
+                Instruction::True => self.push(Value::Boolean(true)),
+                Instruction::False => self.push(Value::Boolean(false)),
                 Instruction::Add => binary_op!(+),
                 Instruction::Subtract => binary_op!(-),
                 Instruction::Multiply => binary_op!(*),

@@ -94,7 +94,7 @@ impl<'a> Compiler<'a> {
         if self.peeked.is_none() {
             self.peeked = self.advance();
         }
-        self.peeked.as_ref().and_then(|t| Some(&t.kind))
+        self.peeked.as_ref().map(|t| &t.kind)
     }
 
     fn peek_check<F: FnOnce(&TokenKind) -> bool>(&mut self, f: F) -> bool {
@@ -231,27 +231,23 @@ impl<'a> Compiler<'a> {
     }
 
     fn synchronize(&mut self) {
-        loop {
-            if let Some(kind) = self.peek() {
-                match kind {
-                    TokenKind::SEMICOLON => {
-                        self.advance();
-                        return;
-                    }
-                    TokenKind::CLASS
-                    | TokenKind::FUN
-                    | TokenKind::VAR
-                    | TokenKind::FOR
-                    | TokenKind::IF
-                    | TokenKind::WHILE
-                    | TokenKind::PRINT
-                    | TokenKind::RETURN => return,
-                    _ => {
-                        self.advance();
-                    }
+        while let Some(kind) = self.peek() {
+            match kind {
+                TokenKind::SEMICOLON => {
+                    self.advance();
+                    return;
                 }
-            } else {
-                break;
+                TokenKind::CLASS
+                | TokenKind::FUN
+                | TokenKind::VAR
+                | TokenKind::FOR
+                | TokenKind::IF
+                | TokenKind::WHILE
+                | TokenKind::PRINT
+                | TokenKind::RETURN => return,
+                _ => {
+                    self.advance();
+                }
             }
         }
     }

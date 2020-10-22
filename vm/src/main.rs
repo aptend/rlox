@@ -2,9 +2,9 @@ use std::env;
 use std::fs::File;
 use std::io::{self, BufRead, BufReader, Read, Write};
 
-use vm::chunk::Chunk;
 use vm::compiler::Compiler;
 use vm::scanner::Scanner;
+use vm::Machine;
 
 fn run_prompt() {
     let mut lines = BufReader::new(io::stdin()).lines();
@@ -34,15 +34,18 @@ fn run_file(filename: String) {
 fn run(source: &str) {
     let scanner = Scanner::new(source);
     let mut compiler = Compiler::new(scanner, "EVA-01 Test Type");
-    match compiler.compile() {
-        Ok(ref chunk) => chunk.disassemble(),
+    let chunk = match compiler.compile() {
+        Ok(chunk) => chunk,
         Err(ref errs) => {
             for err in errs {
                 println!("{}", err);
             }
             return;
         }
-    }
+    };
+    chunk.disassemble();
+    let mut vm = Machine::new(&chunk.code);
+    vm.run();
     // let mut parser = Parser::new(scanner);
     // let stmts = match parser.parse() {
     //     Ok(s) => s,

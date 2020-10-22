@@ -1,19 +1,31 @@
-use crate::chunk::{Chunk, Instruction};
+use crate::chunk::Instruction;
+use crate::common::Value;
 
-use crate::common::{Position, Value};
+const STACK_MAX: usize = 256;
 
-pub struct RunningMachine<'a> {
+pub struct Machine<'a> {
     code: &'a [Instruction],
     ip: usize,
     stack: Vec<Value>,
 }
 
-impl<'a> RunningMachine<'a> {
+impl<'a> Machine<'a> {
+    pub fn new(code: &'a [Instruction]) -> Self {
+        Machine {
+            code,
+            ip: 0,
+            stack: vec![],
+        }
+    }
+
     fn push(&mut self, value: Value) {
+        if self.stack.len() > STACK_MAX {
+            panic!("stack overflow");
+        }
         self.stack.push(value);
     }
     fn pop(&mut self) -> Value {
-        self.stack.pop().unwrap()
+        self.stack.pop().expect("stack underflow")
     }
 
     pub fn run(&mut self) {
@@ -27,6 +39,7 @@ impl<'a> RunningMachine<'a> {
         }
         loop {
             let instr = &self.code[self.ip];
+            self.ip += 1;
             match instr {
                 Instruction::Return => {
                     println!("{}", self.pop());

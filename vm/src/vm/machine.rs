@@ -1,6 +1,5 @@
 use crate::chunk::{Chunk, Instruction};
-use crate::common::Position;
-use crate::common::Value;
+use crate::common::{Arena, Position, Value};
 
 use super::error::RuntimeError;
 
@@ -11,15 +10,17 @@ const STACK_MAX: usize = 256;
 pub struct Machine<'a> {
     code: &'a [Instruction],
     positions: &'a [Position],
+    arena: Arena,
     ip: usize,
     stack: Vec<Value>,
 }
 
 impl<'a> Machine<'a> {
-    pub fn new(chunk: &'a Chunk) -> Self {
+    pub fn new(chunk: &'a Chunk, arena: Arena) -> Self {
         Machine {
             code: &chunk.code,
             positions: &chunk.positions,
+            arena,
             ip: 0,
             stack: vec![],
         }
@@ -79,22 +80,21 @@ impl<'a> Machine<'a> {
                 Instruction::Nil => self.push(Value::Nil),
                 Instruction::True => self.push(Value::Boolean(true)),
                 Instruction::False => self.push(Value::Boolean(false)),
-                Instruction::Add => {
-                    match (self.pop(), self.pop()) {
-                        (Value::Number(b), Value::Number(a)) => {
-                            self.push(Value::Number(a + b))
-                        }
-                        (Value::String(b), Value::String(a)) => {
-                            let a: String = a.to_string() + &b;
-                            self.push(Value::String(a.into()));
-                        }
-                        _ => {
-                            return self.runtime_err(
-                                "Operands must be two numbers or two strings.",
-                            )
-                        }
+                Instruction::Add => match (self.pop(), self.pop()) {
+                    (Value::Number(b), Value::Number(a)) => {
+                        self.push(Value::Number(a + b))
                     }
-                }
+                    (Value::String(b), Value::String(a)) => {
+                        let a: String = a.to_string() + &b;
+                        let val = Value::String(self.arena.alloc_string(a));
+                        self.push(val);
+                    }
+                    _ => {
+                        return self.runtime_err(
+                            "Operands must be two numbers or two strings.",
+                        )
+                    }
+                },
                 Instruction::Subtract => binary_op!(Number, -),
                 Instruction::Multiply => binary_op!(Number, *),
                 Instruction::Divide => binary_op!(Number, /),

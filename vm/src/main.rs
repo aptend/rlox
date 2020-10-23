@@ -34,7 +34,7 @@ fn run_file(filename: String) {
 fn run(source: &str) {
     let scanner = Scanner::new(source);
     let mut compiler = Compiler::new(scanner, "EVA-01 Test Type");
-    let chunk = match compiler.compile() {
+    let (chunk, arena) = match compiler.compile() {
         Ok(chunk) => chunk,
         Err(ref errs) => {
             for err in errs {
@@ -44,7 +44,7 @@ fn run(source: &str) {
         }
     };
     chunk.disassemble();
-    let mut vm = Machine::new(&chunk);
+    let mut vm = Machine::new(&chunk, arena);
     if let Err(ref e) = vm.run() {
         println!("{}", e);
     }

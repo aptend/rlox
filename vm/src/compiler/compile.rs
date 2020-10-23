@@ -1,11 +1,13 @@
 use super::error::SyntaxError;
 use crate::chunk::*;
-use crate::common::{Position, Value};
+use crate::common::{Arena, Position, Value};
 use crate::scanner::*;
 
 use super::prec::Precedence;
 
 use lazy_static::lazy_static;
+
+use std::mem;
 
 type CompileResult<T> = Result<T, SyntaxError>;
 
@@ -59,6 +61,7 @@ pub struct Compiler<'a> {
     errors: Vec<SyntaxError>,
     peeked: Option<Token>,
     tokens: Scanner<'a>,
+    arena: Arena,
     chunk: Chunk,
 }
 
@@ -68,6 +71,7 @@ impl<'a> Compiler<'a> {
             errors: Vec::new(),
             peeked: None,
             tokens: scanner,
+            arena: Arena::default(),
             chunk: Chunk::new(program_name),
         }
     }
@@ -156,7 +160,9 @@ impl<'a> Compiler<'a> {
         let value = match &tk.kind {
             TokenKind::NUMBER(f) => Value::Number(*f),
             // FIXME: copy the string from source code, waste some memory
-            TokenKind::STRING(s) => Value::String(s.as_str().into()),
+            TokenKind::STRING(s) => {
+                Value::String(self.arena.alloc_string_ref(s.as_str()))
+            }
             _ => unimplemented!(),
         };
         self.emit_instr(Instruction::LoadConstant(value), tk.position)
@@ -293,7 +299,7 @@ impl<'a> Compiler<'a> {
         }
     }
 
-    pub fn compile(&mut self) -> Result<Chunk, Vec<SyntaxError>> {
+    pub fn compile(&mut self) -> Result<(Chunk, Arena), Vec<SyntaxError>> {
         while self.peek().is_some() {
             if let Err(e) = self.expression() {
                 self.errors.push(e);
@@ -302,9 +308,9 @@ impl<'a> Compiler<'a> {
         }
         if self.errors.is_empty() {
             self.emit_return(None);
-            Ok(std::mem::take(&mut self.chunk))
+            Ok((mem::take(&mut self.chunk), mem::take(&mut self.arena)))
         } else {
-            Err(std::mem::take(&mut self.errors))
+            Err(mem::take(&mut self.errors))
         }
     }
 }

@@ -79,7 +79,22 @@ impl<'a> Machine<'a> {
                 Instruction::Nil => self.push(Value::Nil),
                 Instruction::True => self.push(Value::Boolean(true)),
                 Instruction::False => self.push(Value::Boolean(false)),
-                Instruction::Add => binary_op!(Number, +),
+                Instruction::Add => {
+                    match (self.pop(), self.pop()) {
+                        (Value::Number(b), Value::Number(a)) => {
+                            self.push(Value::Number(a + b))
+                        }
+                        (Value::String(b), Value::String(a)) => {
+                            let a: String = a.to_string() + &b;
+                            self.push(Value::String(a.into()));
+                        }
+                        _ => {
+                            return self.runtime_err(
+                                "Operands must be two numbers or two strings.",
+                            )
+                        }
+                    }
+                }
                 Instruction::Subtract => binary_op!(Number, -),
                 Instruction::Multiply => binary_op!(Number, *),
                 Instruction::Divide => binary_op!(Number, /),

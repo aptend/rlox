@@ -155,6 +155,8 @@ impl<'a> Compiler<'a> {
         let tk = self.advance().unwrap();
         let value = match &tk.kind {
             TokenKind::NUMBER(f) => Value::Number(*f),
+            // FIXME: copy the string from source code, waste some memory
+            TokenKind::STRING(s) => Value::String(s.as_str().into()),
             _ => unimplemented!(),
         };
         self.emit_instr(Instruction::LoadConstant(value), tk.position)
@@ -238,6 +240,7 @@ impl<'a> Compiler<'a> {
     fn dispatch_prefix(&mut self) -> CompileResult<()> {
         match self.peek() {
             Some(&TokenKind::NUMBER(_)) => self.constant(),
+            Some(&TokenKind::STRING(_)) => self.constant(),
             Some(&TokenKind::LEFT_PAREN) => self.grouping(),
             Some(&TokenKind::MINUS) => self.unary(),
             Some(&TokenKind::BANG) => self.unary(),

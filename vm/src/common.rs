@@ -1,4 +1,5 @@
 use std::fmt;
+use std::rc::Rc;
 
 #[derive(Clone, Debug, Copy, Eq, PartialEq, Default)]
 pub struct Position {
@@ -23,6 +24,10 @@ pub enum Value {
     Nil,
     Number(f64),
     Boolean(bool),
+    // Rc<str> will reduce size of Value, 32 bytes -> 16 bytes
+    // String has 24 bytes: ptr + cap + len
+    // and it is cheap to clone Value::String
+    String(Rc<str>),
 }
 
 impl fmt::Display for Value {
@@ -31,6 +36,7 @@ impl fmt::Display for Value {
             Value::Number(n) => write!(f, "{}", n),
             Value::Nil => write!(f, "nil"),
             Value::Boolean(b) => write!(f, "{}", b),
+            Value::String(s) => write!(f, "{:?}", s),
         }
     }
 }

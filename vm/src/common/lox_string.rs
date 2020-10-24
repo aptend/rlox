@@ -1,3 +1,4 @@
+use std::fmt;
 use std::rc::Rc;
 
 // LoxString is immutable. It should be cheap to clone into stack.
@@ -49,5 +50,11 @@ impl std::ops::Deref for LoxString {
     type Target = str;
     fn deref(&self) -> &Self::Target {
         &self.0
+    }
+}
+
+impl fmt::Display for LoxString {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.0)
     }
 }

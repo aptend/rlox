@@ -144,6 +144,12 @@ impl<'a> Compiler<'a> {
         Ok(())
     }
 
+    // ----------------------------------------------------------------------
+    // ----------------------------------------------------------------------
+    // ----------------   expressions parsing   -----------------------------
+    // ----------------------------------------------------------------------
+    // ----------------------------------------------------------------------
+
     fn expression(&mut self) -> CompileResult<()> {
         self.parse_with(Precedence::Assign)
     }
@@ -277,6 +283,56 @@ impl<'a> Compiler<'a> {
         }
     }
 
+    // ----------------------------------------------------------------------
+    // ----------------------------------------------------------------------
+    // -----------------   statements parsing   -----------------------------
+    // ----------------------------------------------------------------------
+    // ----------------------------------------------------------------------
+
+    fn var_decl(&mut self) -> CompileResult<()> {
+        let tk = self.consume_or_err(&IDENTIFIER, "Expect varibale name")?;
+        let identifier = self.arena.alloc_string_ref(tk.as_str());
+        if self.advance_if_eq(&EQUAL).is_some() {
+            self.expression()?;
+        } else {
+            self.emit_instr(Instruction::Nil, tk.position)?;
+        }
+        self.consume_or_err(
+            &SEMICOLON,
+            "Expect ';' after variable declaration.",
+        )?;
+        self.emit_instr(Instruction::DefGlobal(identifier), tk.position)
+    }
+
+    fn print_stmt(&mut self) -> CompileResult<()> {
+        self.expression()?;
+        let tk = self.consume_or_err(&SEMICOLON, "Expect ';' after value.")?;
+        self.emit_instr(Instruction::Print, tk.position)
+    }
+
+    fn expression_stmt(&mut self) -> CompileResult<()> {
+        self.expression()?;
+        let tk =
+            self.consume_or_err(&SEMICOLON, "Expect ';' after expression.")?;
+        self.emit_instr(Instruction::Pop, tk.position)
+    }
+
+    fn statement(&mut self) -> CompileResult<()> {
+        if self.advance_if_eq(&PRINT).is_some() {
+            return self.print_stmt();
+        } else {
+            self.expression_stmt()
+        }
+    }
+
+    fn declaration(&mut self) -> CompileResult<()> {
+        if self.advance_if_eq(&VAR).is_some() {
+            self.var_decl()
+        } else {
+            self.statement()
+        }
+    }
+
     fn synchronize(&mut self) {
         while let Some(kind) = self.peek() {
             match kind {
@@ -301,7 +357,7 @@ impl<'a> Compiler<'a> {
 
     pub fn compile(&mut self) -> Result<(Chunk, Arena), Vec<SyntaxError>> {
         while self.peek().is_some() {
-            if let Err(e) = self.expression() {
+            if let Err(e) = self.declaration() {
                 self.errors.push(e);
                 self.synchronize();
             }

@@ -1,12 +1,15 @@
 use std::fmt;
 
-use crate::common::{Position, Value};
+use crate::common::{LoxString, Position, Value};
 
 // Instructions run in a virtual machine, 16 byets
 pub enum Instruction {
     LoadConstant(Value),
     Negate,
     Not,
+
+    DefGlobal(LoxString),
+    Print,
 
     Add,
     Subtract,
@@ -21,15 +24,20 @@ pub enum Instruction {
     False,
     True,
 
+    Pop,
     Return,
 }
 
 impl fmt::Display for Instruction {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
+            Instruction::DefGlobal(s) => {
+                write!(f, "{:20} {}", "OP_DefineGlobal", s)
+            }
             Instruction::LoadConstant(c) => {
                 write!(f, "{:20} {}", "OP_LoadConstant", c)
             }
+            Instruction::Print => write!(f, "OP_Print"),
             Instruction::Negate => write!(f, "OP_Negate"),
             Instruction::Not => write!(f, "OP_Not"),
             Instruction::Add => write!(f, "OP_Add"),
@@ -44,6 +52,7 @@ impl fmt::Display for Instruction {
             Instruction::True => write!(f, "OP_LoadTrue"),
             Instruction::False => write!(f, "OP_LoadFalse"),
             Instruction::Return => write!(f, "OP_Return"),
+            Instruction::Pop => write!(f, "OP_Pop"),
         }
     }
 }

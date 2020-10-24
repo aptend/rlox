@@ -1,7 +1,6 @@
 use super::lox_string::LoxString;
 
 use std::fmt;
-use std::ops::Deref;
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Value {
@@ -17,7 +16,7 @@ impl fmt::Display for Value {
             Value::Number(n) => write!(f, "{}", n),
             Value::Nil => write!(f, "nil"),
             Value::Boolean(b) => write!(f, "{}", b),
-            Value::String(s) => write!(f, "{:?}", s.deref()),
+            Value::String(s) => write!(f, "'{}'", s),
         }
     }
 }

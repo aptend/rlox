@@ -33,7 +33,7 @@ impl<'a> Machine<'a> {
         self.stack.push(value);
     }
 
-    fn _peek_at(&self, distance: usize) -> &Value {
+    fn peek(&self, distance: usize) -> &Value {
         let idx = self.stack.len() - distance - 1;
         &self.stack[idx]
     }
@@ -65,8 +65,17 @@ impl<'a> Machine<'a> {
             self.ip += 1;
             match instr {
                 Instruction::Return => {
-                    println!("{}", self.pop());
+                    // println!("{}", self.pop());
                     return Ok(());
+                }
+                Instruction::Pop => {
+                    self.pop();
+                }
+                Instruction::Print => {
+                    println!("{}", self.peek(0));
+                }
+                Instruction::DefGlobal(_name) => {
+                    
                 }
                 Instruction::Negate => match self.pop() {
                     Value::Number(f) => self.push(Value::Number(-f)),

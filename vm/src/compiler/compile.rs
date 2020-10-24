@@ -154,10 +154,20 @@ impl<'a> Compiler<'a> {
         self.parse_with(Precedence::Assign)
     }
 
-    fn variable(&mut self) -> CompileResult<()> {
+    fn variable(&mut self, can_assign: bool) -> CompileResult<()> {
         let tk = self.advance().unwrap();
         let identifier = self.arena.alloc_string_ref(tk.as_str());
-        self.emit_instr(Instruction::GetGlobal(identifier), tk.position)
+        // Assignment expression has no handler in `dispatch_prefix`,
+        // so we have to tackle with its precedence manually.
+        // variable has two references:
+        //   1. dispatch_prefix
+        //   2. call TODO
+        if can_assign && self.advance_if_eq(&EQUAL).is_some() {
+            self.expression()?; // more assignment
+            self.emit_instr(Instruction::SetGlobal(identifier), tk.position)
+        } else {
+            self.emit_instr(Instruction::GetGlobal(identifier), tk.position)
+        }
     }
 
     fn grouping(&mut self) -> CompileResult<()> {
@@ -244,22 +254,29 @@ impl<'a> Compiler<'a> {
     }
 
     fn parse_with(&mut self, prec: Precedence) -> CompileResult<()> {
-        self.dispatch_prefix()?;
+        let can_assign = prec <= Precedence::Assign;
+        self.dispatch_prefix(can_assign)?;
         // Precedence::of is a 'flatterer' of Rust borrow checker.
         // The reference returned by self.peek() holds &mut self, it
         // can't be passed into a method like self.precedence_of(kind)
         while prec <= Precedence::of(self.peek()) {
             self.dispatch_infix()?;
         }
+        if can_assign && self.peek_check(|k| k == &*EQUAL) {
+            return Err(SyntaxError::new_compiler_err(
+                self.advance(),
+                "Invalid assignment target.",
+            ));
+        }
         Ok(())
     }
 
     // use match expression to mock a the prefix table
-    fn dispatch_prefix(&mut self) -> CompileResult<()> {
+    fn dispatch_prefix(&mut self, can_assign: bool) -> CompileResult<()> {
         match self.peek() {
             Some(&TokenKind::NUMBER(_)) => self.constant(),
             Some(&TokenKind::STRING(_)) => self.constant(),
-            Some(&TokenKind::IDENTIFIER(_)) => self.variable(),
+            Some(&TokenKind::IDENTIFIER(_)) => self.variable(can_assign),
             Some(&TokenKind::LEFT_PAREN) => self.grouping(),
             Some(&TokenKind::MINUS) => self.unary(),
             Some(&TokenKind::BANG) => self.unary(),

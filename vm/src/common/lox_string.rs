@@ -6,7 +6,7 @@ use std::rc::Rc;
 // Compare:
 //   String has 24 bytes: ptr + cap + len
 //   Rc<str> has 16 bytes, it's a fat pointer, ptr + len
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct LoxString(Rc<String>);
 
 impl LoxString {
@@ -56,5 +56,11 @@ impl std::ops::Deref for LoxString {
 impl fmt::Display for LoxString {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{}", self.0)
+    }
+}
+
+impl fmt::Debug for LoxString {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{:?}", self.0)
     }
 }

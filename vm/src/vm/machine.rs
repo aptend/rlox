@@ -3,6 +3,9 @@ use crate::common::{Arena, Position, Value};
 
 use super::error::RuntimeError;
 
+use std::fmt::{format, Arguments};
+use std::format_args as args;
+
 type VmResult<T> = Result<T, RuntimeError>;
 
 const STACK_MAX: usize = 256;
@@ -42,9 +45,9 @@ impl<'a> Machine<'a> {
         self.stack.pop().expect("stack underflow")
     }
 
-    fn runtime_err(&self, msg: &str) -> VmResult<()> {
+    fn runtime_err(&self, args: Arguments) -> VmResult<()> {
         let pos = self.positions[self.ip - 1];
-        Err(RuntimeError::new(pos, msg))
+        Err(RuntimeError::new(pos, format(args)))
     }
 
     pub fn run(&mut self) -> VmResult<()> {
@@ -54,7 +57,7 @@ impl<'a> Machine<'a> {
             ($typ: tt, $op: tt) => {
                 match (self.pop(), self.pop()) {
                     (Value::Number(a), Value::Number(b)) => self.push(Value::$typ(b $op a)),
-                    _ => return self.runtime_err("Operands must be numbers."),
+                    _ => return self.runtime_err(args!("Operands must be numbers.")),
                 }
             }
         }
@@ -76,23 +79,37 @@ impl<'a> Machine<'a> {
                 }
                 Instruction::DefGlobal(key) => {
                     let val = self.pop();
-                    self.arena.define_global(key.clone(), val);
+                    self.arena.set_global(key.clone(), val);
                 }
                 Instruction::GetGlobal(key) => {
                     let val = match self.arena.get_global(key) {
                         Some(v) => v,
                         None => {
-                            return self.runtime_err(&format!(
-                                "Undefined variable '{}'.",
+                            return self.runtime_err(args!(
+                                "Undefined variable {:?}.",
                                 key
-                            ))
+                            ));
                         }
                     };
                     self.push(val);
                 }
+                Instruction::SetGlobal(key) => {
+                    if self.arena.get_global(key).is_some() {
+                        self.arena
+                            .set_global(key.clone(), self.peek(0).clone());
+                    } else {
+                        return self.runtime_err(args!(
+                            "Undefined variable {:?}.",
+                            key
+                        ));
+                    }
+                }
                 Instruction::Negate => match self.pop() {
                     Value::Number(f) => self.push(Value::Number(-f)),
-                    _ => return self.runtime_err("Operand must be a number."),
+                    _ => {
+                        return self
+                            .runtime_err(args!("Operand must be a number."))
+                    }
                 },
                 Instruction::Not => {
                     let val = !self.pop().is_truthy();
@@ -112,9 +129,9 @@ impl<'a> Machine<'a> {
                         self.push(val);
                     }
                     _ => {
-                        return self.runtime_err(
+                        return self.runtime_err(args!(
                             "Operands must be two numbers or two strings.",
-                        )
+                        ));
                     }
                 },
                 Instruction::Subtract => binary_op!(Number, -),

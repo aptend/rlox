@@ -56,7 +56,7 @@ impl Arena {
         }
     }
 
-    pub fn define_global(&mut self, key: LoxString, val: Value) {
+    pub fn set_global(&mut self, key: LoxString, val: Value) {
         self.globals.insert(key, val);
     }
 

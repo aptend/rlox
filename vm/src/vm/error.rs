@@ -13,10 +13,7 @@ impl fmt::Display for RuntimeError {
 }
 
 impl RuntimeError {
-    pub fn new(pos: Position, msg: &str) -> Self {
-        RuntimeError {
-            msg: msg.to_string(),
-            pos,
-        }
+    pub fn new(pos: Position, msg: String) -> Self {
+        RuntimeError { msg, pos }
     }
 }

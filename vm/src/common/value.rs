@@ -16,7 +16,7 @@ impl fmt::Display for Value {
             Value::Number(n) => write!(f, "{}", n),
             Value::Nil => write!(f, "nil"),
             Value::Boolean(b) => write!(f, "{}", b),
-            Value::String(s) => write!(f, "'{}'", s),
+            Value::String(s) => write!(f, "{}", s),
         }
     }
 }

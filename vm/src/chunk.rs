@@ -10,6 +10,7 @@ pub enum Instruction {
 
     DefGlobal(LoxString),
     GetGlobal(LoxString),
+    SetGlobal(LoxString),
     Print,
 
     Add,
@@ -33,10 +34,13 @@ impl fmt::Display for Instruction {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Instruction::DefGlobal(s) => {
-                write!(f, "{:20} {}", "OP_DefineGlobal", s)
+                write!(f, "{:20} {:?}", "OP_DefineGlobal", s)
             }
             Instruction::GetGlobal(s) => {
-                write!(f, "{:20} {}", "OP_GetGlobal", s)
+                write!(f, "{:20} {:?}", "OP_GetGlobal", s)
+            }
+            Instruction::SetGlobal(s) => {
+                write!(f, "{:20} {:?}", "OP_SetGlobal", s)
             }
             Instruction::LoadConstant(c) => {
                 write!(f, "{:20} {}", "OP_LoadConstant", c)

@@ -9,6 +9,7 @@ pub enum Instruction {
     Not,
 
     DefGlobal(LoxString),
+    GetGlobal(LoxString),
     Print,
 
     Add,
@@ -33,6 +34,9 @@ impl fmt::Display for Instruction {
         match self {
             Instruction::DefGlobal(s) => {
                 write!(f, "{:20} {}", "OP_DefineGlobal", s)
+            }
+            Instruction::GetGlobal(s) => {
+                write!(f, "{:20} {}", "OP_GetGlobal", s)
             }
             Instruction::LoadConstant(c) => {
                 write!(f, "{:20} {}", "OP_LoadConstant", c)

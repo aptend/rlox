@@ -72,10 +72,23 @@ impl<'a> Machine<'a> {
                     self.pop();
                 }
                 Instruction::Print => {
-                    println!("{}", self.peek(0));
+                    println!("{}", self.pop());
                 }
-                Instruction::DefGlobal(_name) => {
-                    
+                Instruction::DefGlobal(key) => {
+                    let val = self.pop();
+                    self.arena.define_global(key.clone(), val);
+                }
+                Instruction::GetGlobal(key) => {
+                    let val = match self.arena.get_global(key) {
+                        Some(v) => v,
+                        None => {
+                            return self.runtime_err(&format!(
+                                "Undefined variable '{}'.",
+                                key
+                            ))
+                        }
+                    };
+                    self.push(val);
                 }
                 Instruction::Negate => match self.pop() {
                     Value::Number(f) => self.push(Value::Number(-f)),

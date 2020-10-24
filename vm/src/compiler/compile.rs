@@ -154,6 +154,12 @@ impl<'a> Compiler<'a> {
         self.parse_with(Precedence::Assign)
     }
 
+    fn variable(&mut self) -> CompileResult<()> {
+        let tk = self.advance().unwrap();
+        let identifier = self.arena.alloc_string_ref(tk.as_str());
+        self.emit_instr(Instruction::GetGlobal(identifier), tk.position)
+    }
+
     fn grouping(&mut self) -> CompileResult<()> {
         self.advance(); // skip '('
         self.expression()?;
@@ -253,6 +259,7 @@ impl<'a> Compiler<'a> {
         match self.peek() {
             Some(&TokenKind::NUMBER(_)) => self.constant(),
             Some(&TokenKind::STRING(_)) => self.constant(),
+            Some(&TokenKind::IDENTIFIER(_)) => self.variable(),
             Some(&TokenKind::LEFT_PAREN) => self.grouping(),
             Some(&TokenKind::MINUS) => self.unary(),
             Some(&TokenKind::BANG) => self.unary(),

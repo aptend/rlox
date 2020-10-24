@@ -55,4 +55,12 @@ impl Arena {
             }
         }
     }
+
+    pub fn define_global(&mut self, key: LoxString, val: Value) {
+        self.globals.insert(key, val);
+    }
+
+    pub fn get_global(&mut self, key: &LoxString) -> Option<Value> {
+        self.globals.get(key).cloned()
+    }
 }

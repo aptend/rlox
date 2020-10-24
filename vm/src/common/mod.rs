@@ -1,3 +1,5 @@
+//! Structs bridging comipiling and executing
+
 mod arena;
 mod lox_string;
 mod value;

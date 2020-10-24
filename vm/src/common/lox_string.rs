@@ -1,7 +1,7 @@
 use std::rc::Rc;
 
 // LoxString is immutable. It should be cheap to clone into stack.
-// Rc<String> has 8 bytes, which keep the size of Value 16 bytes
+// Rc<String> has 8 bytes, which keeps the size of Value 16 bytes
 // Compare:
 //   String has 24 bytes: ptr + cap + len
 //   Rc<str> has 16 bytes, it's a fat pointer, ptr + len
@@ -9,8 +9,8 @@ use std::rc::Rc;
 pub struct LoxString(Rc<String>);
 
 impl LoxString {
-    // !! these two from converters must be called after global intern. !!
-    // could have impl them using converter::From, but i think it is better
+    // !! these two converters must be called after global intern.
+    // Could have impl them using std::converter::From, but it is better
     // to make them more explicit and less visible
     pub(crate) fn from_owned(s: String) -> Self {
         LoxString(Rc::new(s))

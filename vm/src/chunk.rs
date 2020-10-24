@@ -2,6 +2,7 @@ use std::fmt;
 
 use crate::common::{Position, Value};
 
+// Instructions run in a virtual machine, 16 byets
 pub enum Instruction {
     LoadConstant(Value),
     Negate,
@@ -91,6 +92,11 @@ impl Chunk {
 #[cfg(test)]
 mod test {
     use super::*;
+    #[test]
+    fn test_size_of_value() {
+        assert_eq!(16, std::mem::size_of::<Value>());
+    }
+
     #[test]
     fn test_dis() {
         let mut chunk = Chunk::new("test program");

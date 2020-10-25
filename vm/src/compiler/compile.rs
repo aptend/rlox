@@ -4,6 +4,7 @@ use crate::common::{Arena, Position, Value};
 use crate::scanner::*;
 
 use super::prec::Precedence;
+use super::resolver::Resolver;
 
 use lazy_static::lazy_static;
 
@@ -62,6 +63,7 @@ pub struct Compiler<'a> {
     peeked: Option<Token>,
     tokens: Scanner<'a>,
     arena: Arena,
+    resolver: Resolver,
     chunk: Chunk,
 }
 
@@ -72,6 +74,7 @@ impl<'a> Compiler<'a> {
             peeked: None,
             tokens: scanner,
             arena: Arena::default(),
+            resolver: Resolver::default(),
             chunk: Chunk::new(program_name),
         }
     }
@@ -156,7 +159,17 @@ impl<'a> Compiler<'a> {
 
     fn variable(&mut self, can_assign: bool) -> CompileResult<()> {
         let tk = self.advance().unwrap();
-        let identifier = self.arena.alloc_string_ref(tk.as_str());
+
+        let get_op;
+        let set_op;
+        if let Some(idx) = self.resolver.resolve_variale(tk.as_str()) {
+            get_op = Instruction::GetLocal(idx);
+            set_op = Instruction::SetLocal(idx);
+        } else {
+            let ident = self.arena.alloc_string_ref(tk.as_str());
+            get_op = Instruction::GetGlobal(ident.clone());
+            set_op = Instruction::SetGlobal(ident);
+        }
         // Assignment expression has no handler in `dispatch_prefix`,
         // so we have to tackle with its precedence manually.
         // variable has two references:
@@ -164,9 +177,9 @@ impl<'a> Compiler<'a> {
         //   2. call TODO
         if can_assign && self.advance_if_eq(&EQUAL).is_some() {
             self.expression()?; // more assignment
-            self.emit_instr(Instruction::SetGlobal(identifier), tk.position)
+            self.emit_instr(set_op, tk.position)
         } else {
-            self.emit_instr(Instruction::GetGlobal(identifier), tk.position)
+            self.emit_instr(get_op, tk.position)
         }
     }
 
@@ -314,8 +327,20 @@ impl<'a> Compiler<'a> {
     // ----------------------------------------------------------------------
 
     fn var_decl(&mut self) -> CompileResult<()> {
-        let tk = self.consume_or_err(&IDENTIFIER, "Expect varibale name")?;
-        let identifier = self.arena.alloc_string_ref(tk.as_str());
+        let tk = self.consume_or_err(&IDENTIFIER, "Expect variable name")?;
+        // declareVariable in clox
+        let ident = if self.resolver.is_local_ready() {
+            if !self.resolver.declare_variable(tk.as_str()) {
+                return Err(SyntaxError::new_compiler_err(
+                    Some(tk),
+                    "Already variable with this name in this scope.",
+                ));
+            }
+            None
+        } else {
+            Some(self.arena.alloc_string_ref(tk.as_str()))
+        };
+        // initializer
         if self.advance_if_eq(&EQUAL).is_some() {
             self.expression()?;
         } else {
@@ -325,7 +350,12 @@ impl<'a> Compiler<'a> {
             &SEMICOLON,
             "Expect ';' after variable declaration.",
         )?;
-        self.emit_instr(Instruction::DefGlobal(identifier), tk.position)
+        if let Some(identifier) = ident {
+            self.emit_instr(Instruction::DefGlobal(identifier), tk.position)?;
+        } else {
+            self.resolver.mark_initialized();
+        }
+        Ok(())
     }
 
     fn print_stmt(&mut self) -> CompileResult<()> {
@@ -341,9 +371,28 @@ impl<'a> Compiler<'a> {
         self.emit_instr(Instruction::Pop, tk.position)
     }
 
+    fn block_stmt(&mut self) -> CompileResult<()> {
+        while self.peek_check(|k| k != &*RIGHT_BRACE) {
+            if let Err(err) = self.declaration() {
+                self.errors.push(err);
+                self.synchronize();
+            }
+        }
+        self.consume_or_err(&RIGHT_BRACE, "Expect '}' after block.")?;
+        Ok(())
+    }
+
     fn statement(&mut self) -> CompileResult<()> {
         if self.advance_if_eq(&PRINT).is_some() {
             return self.print_stmt();
+        } else if self.advance_if_eq(&LEFT_BRACE).is_some() {
+            self.resolver.begin_scope();
+            self.block_stmt()?;
+            for _ in 0..self.resolver.end_scope() {
+                // Pop never fails, it doesn't matter what the position is.
+                self.emit_instr(Instruction::Pop, Position::default())?;
+            }
+            Ok(())
         } else {
             self.expression_stmt()
         }

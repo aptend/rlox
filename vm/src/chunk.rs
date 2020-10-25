@@ -11,6 +11,8 @@ pub enum Instruction {
     DefGlobal(LoxString),
     GetGlobal(LoxString),
     SetGlobal(LoxString),
+    GetLocal(usize),
+    SetLocal(usize),
     Print,
 
     Add,
@@ -41,6 +43,12 @@ impl fmt::Display for Instruction {
             }
             Instruction::SetGlobal(s) => {
                 write!(f, "{:20} {:?}", "OP_SetGlobal", s)
+            }
+            Instruction::GetLocal(i) => {
+                write!(f, "{:20} {:?}", "OP_GetLocal", i)
+            }
+            Instruction::SetLocal(i) => {
+                write!(f, "{:20} {:?}", "OP_SetLocal", i)
             }
             Instruction::LoadConstant(c) => {
                 write!(f, "{:20} {}", "OP_LoadConstant", c)

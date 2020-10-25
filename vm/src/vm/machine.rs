@@ -62,9 +62,10 @@ impl<'a> Machine<'a> {
             }
         }
         loop {
-            // for debug
-            // println!("{:?}", self.stack);
             let instr = &self.code[self.ip];
+            // for debug
+            // println!("{}", instr);
+            // println!(" {:?}\n", self.stack);
             self.ip += 1;
             match instr {
                 Instruction::Return => {
@@ -103,6 +104,13 @@ impl<'a> Machine<'a> {
                             key
                         ));
                     }
+                }
+                Instruction::GetLocal(idx) => {
+                    let val = self.stack[*idx].clone();
+                    self.push(val);
+                }
+                Instruction::SetLocal(idx) => {
+                     self.stack[*idx] = self.peek(0).clone();
                 }
                 Instruction::Negate => match self.pop() {
                     Value::Number(f) => self.push(Value::Number(-f)),

@@ -138,6 +138,12 @@ impl<'a> Compiler<'a> {
         self.chunk.push_instr(Instruction::Return, pos);
     }
 
+    fn emit_loop(&mut self, start: usize) {
+        let offset = self.chunk.code.len() - start + 1;
+        self.chunk
+            .push_instr(Instruction::Loop(offset), Position::default());
+    }
+
     fn emit_pop(&mut self) {
         // Pop never fails, it doesn't matter what the position is.
         self.chunk.push_instr(Instruction::Pop, Position::default());
@@ -145,6 +151,7 @@ impl<'a> Compiler<'a> {
 
     // Emit a jump instruction, return its index for later patching.
     fn emit_jump(&mut self, instr: Instruction) -> usize {
+        // max_value to make program panic if something is going wrong.
         let offset = usize::max_value();
         let pos = Position::default();
         let instr = match instr {
@@ -460,11 +467,28 @@ impl<'a> Compiler<'a> {
         Ok(())
     }
 
+    fn while_stmt(&mut self) -> CompileResult<()> {
+        let loop_start = self.chunk.code.len();
+        self.consume_or_err(&LEFT_PAREN, "Expect '(' after 'while'.")?;
+        self.expression()?;
+        self.consume_or_err(&RIGHT_PAREN, "Expect ')' after condition.")?;
+        let end_jump = self.emit_jump(Instruction::JumpIfFalse(0));
+        self.emit_pop();
+        self.statement()?;
+        self.emit_loop(loop_start);
+
+        self.patch_jump(end_jump);
+        self.emit_pop();
+        Ok(())
+    }
+
     fn statement(&mut self) -> CompileResult<()> {
         if self.advance_if_eq(&PRINT).is_some() {
             self.print_stmt()
         } else if self.advance_if_eq(&IF).is_some() {
             self.if_stmt()
+        } else if self.advance_if_eq(&WHILE).is_some() {
+            self.while_stmt()
         } else if self.advance_if_eq(&LEFT_BRACE).is_some() {
             self.resolver.begin_scope();
             self.block_stmt()?;

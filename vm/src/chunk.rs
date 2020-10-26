@@ -17,6 +17,7 @@ pub enum Instruction {
 
     Jump(usize),
     JumpIfFalse(usize),
+    Loop(usize),
 
     Add,
     Subtract,
@@ -59,6 +60,7 @@ impl fmt::Display for Instruction {
             Instruction::JumpIfFalse(n) => {
                 write!(f, "{:20} +{}", "OP_Jump_False", n + 1)
             }
+            Instruction::Loop(n) => write!(f, "{:20} -{}", "OP_Loop", n - 1),
             Instruction::Print => write!(f, "OP_Print"),
             Instruction::Negate => write!(f, "OP_Negate"),
             Instruction::Not => write!(f, "OP_Not"),

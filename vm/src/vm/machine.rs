@@ -83,6 +83,9 @@ impl<'a> Machine<'a> {
                         self.ip += offset;
                     }
                 }
+                Instruction::Loop(offset) => {
+                    self.ip -= offset;
+                }
                 Instruction::Print => {
                     println!("{}", self.pop());
                 }

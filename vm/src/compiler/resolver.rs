@@ -58,6 +58,9 @@ impl Resolver {
     }
 
     pub fn resolve_variale(&self, name: &str) -> Option<usize> {
+        if self.cur_depth == 0 {
+            return None;
+        }
         self.locals
             .iter()
             .rev()

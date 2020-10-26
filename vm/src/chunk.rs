@@ -15,6 +15,9 @@ pub enum Instruction {
     SetLocal(usize),
     Print,
 
+    Jump(usize),
+    JumpIfFalse(usize),
+
     Add,
     Subtract,
     Multiply,
@@ -52,6 +55,10 @@ impl fmt::Display for Instruction {
             }
             Instruction::LoadConstant(c) => {
                 write!(f, "{:20} {}", "OP_LoadConstant", c)
+            }
+            Instruction::Jump(n) => write!(f, "{:20} +{}", "OP_Jump", n + 1),
+            Instruction::JumpIfFalse(n) => {
+                write!(f, "{:20} +{}", "OP_Jump_False", n + 1)
             }
             Instruction::Print => write!(f, "OP_Print"),
             Instruction::Negate => write!(f, "OP_Negate"),
@@ -103,11 +110,10 @@ impl Chunk {
 
     fn dis_instr(&self, offset: usize) {
         let line = self.positions[offset].line;
-        if offset > 0 && line == self.positions[offset - 1].line {
-            println!("{:04}    | {}", offset, self.code[offset]);
-        } else if line == 0 {
-            // not instr from token, like the last return of vm
+        if line == 0 {
             println!("{:04}    * {}", offset, self.code[offset]);
+        } else if offset > 0 && line == self.positions[offset - 1].line {
+            println!("{:04}    | {}", offset, self.code[offset]);
         } else {
             println!("{:04} {:>4} {}", offset, line, self.code[offset]);
         }

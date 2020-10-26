@@ -18,6 +18,8 @@ pub enum Precedence {
 impl Precedence {
     pub fn of(kind: Option<&TokenKind>) -> Self {
         match kind {
+            Some(&TokenKind::AND) => Precedence::And,
+            Some(&TokenKind::OR) => Precedence::Or,
             Some(&TokenKind::PLUS) | Some(TokenKind::MINUS) => Precedence::Term,
             Some(&TokenKind::STAR) | Some(TokenKind::SLASH) => {
                 Precedence::Factor
@@ -31,7 +33,7 @@ impl Precedence {
             Some(&TokenKind::GREATER)
             | Some(&TokenKind::GREATER_EQUAL)
             | Some(&TokenKind::LESS)
-            | Some(&TokenKind::LESS_EQUAL) => Precedence::Equal,
+            | Some(&TokenKind::LESS_EQUAL) => Precedence::Compare,
             Some(&TokenKind::QUESTION) => Precedence::Ternary,
             _ => Precedence::None,
         }

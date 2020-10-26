@@ -75,6 +75,14 @@ impl<'a> Machine<'a> {
                 Instruction::Pop => {
                     self.pop();
                 }
+                Instruction::Jump(offset) => {
+                    self.ip += offset;
+                }
+                Instruction::JumpIfFalse(offset) => {
+                    if !self.peek(0).is_truthy() {
+                        self.ip += offset;
+                    }
+                }
                 Instruction::Print => {
                     println!("{}", self.pop());
                 }
@@ -110,7 +118,7 @@ impl<'a> Machine<'a> {
                     self.push(val);
                 }
                 Instruction::SetLocal(idx) => {
-                     self.stack[*idx] = self.peek(0).clone();
+                    self.stack[*idx] = self.peek(0).clone();
                 }
                 Instruction::Negate => match self.pop() {
                     Value::Number(f) => self.push(Value::Number(-f)),

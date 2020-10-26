@@ -138,6 +138,36 @@ impl<'a> Compiler<'a> {
         self.chunk.push_instr(Instruction::Return, pos);
     }
 
+    fn emit_pop(&mut self) {
+        // Pop never fails, it doesn't matter what the position is.
+        self.chunk.push_instr(Instruction::Pop, Position::default());
+    }
+
+    // Emit a jump instruction, return its index for later patching.
+    fn emit_jump(&mut self, instr: Instruction) -> usize {
+        let offset = usize::max_value();
+        let pos = Position::default();
+        let instr = match instr {
+            Instruction::Jump(_) => Instruction::Jump(offset),
+            Instruction::JumpIfFalse(_) => Instruction::JumpIfFalse(offset),
+            _ => panic!("wrong arg for emit_jump"),
+        };
+        self.chunk.push_instr(instr, pos);
+        self.chunk.code.len() - 1
+    }
+
+    // Patch the jump instruction at index, update its offset to the current
+    // address.
+    fn patch_jump(&mut self, index: usize) {
+        let offset = self.chunk.code.len() - index - 1;
+        let instr = self.chunk.code.get_mut(index).unwrap();
+        *instr = match *instr {
+            Instruction::JumpIfFalse(_) => Instruction::JumpIfFalse(offset),
+            Instruction::Jump(_) => Instruction::Jump(offset),
+            _ => unreachable!(),
+        }
+    }
+
     fn emit_instr(
         &mut self,
         instr: Instruction,
@@ -246,9 +276,9 @@ impl<'a> Compiler<'a> {
             _ => unreachable!(),
         };
         self.emit_instr(instr, tk.position)?;
-        if &tk.kind == &*LESS_EQUAL
-            || &tk.kind == &*GREATER_EQUAL
-            || &tk.kind == &*BANG_EQUAL
+        if tk.kind == *LESS_EQUAL
+            || tk.kind == *GREATER_EQUAL
+            || tk.kind == *BANG_EQUAL
         {
             self.emit_instr(Instruction::Not, tk.position)?;
         }
@@ -264,6 +294,26 @@ impl<'a> Compiler<'a> {
         self.consume_or_err(&COLON, "Expect ':' in ternary expression")?;
         self.parse_with(Precedence::Ternary)?;
         self.emit_instr(Instruction::Ternary, tk.position)
+    }
+
+    fn and(&mut self) -> CompileResult<()> {
+        self.advance();
+        let end_jump = self.emit_jump(Instruction::JumpIfFalse(0));
+        self.emit_pop();
+        self.parse_with(Precedence::And)?;
+        self.patch_jump(end_jump);
+        Ok(())
+    }
+
+    fn or(&mut self) -> CompileResult<()> {
+        self.advance();
+        let else_jump = self.emit_jump(Instruction::JumpIfFalse(0));
+        let end_jump = self.emit_jump(Instruction::Jump(0));
+        self.patch_jump(else_jump);
+        self.emit_pop();
+        self.parse_with(Precedence::Or)?;
+        self.patch_jump(end_jump);
+        Ok(())
     }
 
     fn parse_with(&mut self, prec: Precedence) -> CompileResult<()> {
@@ -316,6 +366,8 @@ impl<'a> Compiler<'a> {
             | Some(&TokenKind::GREATER)
             | Some(&TokenKind::GREATER_EQUAL) => self.binary(),
             Some(&TokenKind::QUESTION) => self.ternary(),
+            Some(&TokenKind::AND) => self.and(),
+            Some(&TokenKind::OR) => self.or(),
             _ => unreachable!(),
         }
     }
@@ -366,9 +418,9 @@ impl<'a> Compiler<'a> {
 
     fn expression_stmt(&mut self) -> CompileResult<()> {
         self.expression()?;
-        let tk =
-            self.consume_or_err(&SEMICOLON, "Expect ';' after expression.")?;
-        self.emit_instr(Instruction::Pop, tk.position)
+        self.consume_or_err(&SEMICOLON, "Expect ';' after expression.")?;
+        self.emit_pop();
+        Ok(())
     }
 
     fn block_stmt(&mut self) -> CompileResult<()> {
@@ -382,15 +434,34 @@ impl<'a> Compiler<'a> {
         Ok(())
     }
 
+    fn if_stmt(&mut self) -> CompileResult<()> {
+        self.consume_or_err(&LEFT_PAREN, "Expect '(' after 'if'.")?;
+        self.expression()?;
+        self.consume_or_err(&RIGHT_PAREN, "Expect ')' after condition.")?;
+        let then_jump = self.emit_jump(Instruction::JumpIfFalse(0));
+        self.emit_pop(); // pop condition value and execute then branch.
+        self.statement()?; // then branch.
+        let end_jump = self.emit_jump(Instruction::Jump(0));
+        self.patch_jump(then_jump);
+        self.emit_pop(); // pop condition value and try to execute else branch.
+
+        if self.advance_if_eq(&ELSE).is_some() {
+            self.statement()?; // else branch.
+        }
+        self.patch_jump(end_jump);
+        Ok(())
+    }
+
     fn statement(&mut self) -> CompileResult<()> {
         if self.advance_if_eq(&PRINT).is_some() {
-            return self.print_stmt();
+            self.print_stmt()
+        } else if self.advance_if_eq(&IF).is_some() {
+            self.if_stmt()
         } else if self.advance_if_eq(&LEFT_BRACE).is_some() {
             self.resolver.begin_scope();
             self.block_stmt()?;
             for _ in 0..self.resolver.end_scope() {
-                // Pop never fails, it doesn't matter what the position is.
-                self.emit_instr(Instruction::Pop, Position::default())?;
+                self.emit_pop();
             }
             Ok(())
         } else {

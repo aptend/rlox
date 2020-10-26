@@ -159,16 +159,6 @@ impl<'a> Machine<'a> {
                     let (a, b) = (self.pop(), self.pop());
                     self.push(Value::Boolean(a == b))
                 }
-                Instruction::Ternary => {
-                    // TODO: jump execution
-                    let right = self.pop();
-                    let left = self.pop();
-                    if self.pop().is_truthy() {
-                        self.push(left);
-                    } else {
-                        self.push(right);
-                    }
-                }
             }
         }
     }

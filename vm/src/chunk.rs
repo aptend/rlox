@@ -25,7 +25,6 @@ pub enum Instruction {
     Equal,
     Less,
     Greater,
-    Ternary,
 
     Nil,
     False,
@@ -70,7 +69,6 @@ impl fmt::Display for Instruction {
             Instruction::Equal => write!(f, "OP_Equal"),
             Instruction::Less => write!(f, "OP_Less"),
             Instruction::Greater => write!(f, "OP_Greater"),
-            Instruction::Ternary => write!(f, "OP_Ternary"),
             Instruction::Nil => write!(f, "OP_LoadNil"),
             Instruction::True => write!(f, "OP_LoadTrue"),
             Instruction::False => write!(f, "OP_LoadFalse"),

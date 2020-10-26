@@ -286,14 +286,22 @@ impl<'a> Compiler<'a> {
     }
 
     fn ternary(&mut self) -> CompileResult<()> {
-        let tk = self.advance().unwrap();
+        self.advance();
         // right-associated:
         // 1>0?10:20?100:101 will expand to 1>0? 10 : (20?100:101) = 10
         // and we don't want this: cond ? A=foo : B=bar
-        self.parse_with(Precedence::Ternary)?;
+
+        let then_jump = self.emit_jump(Instruction::JumpIfFalse(0));
+        self.emit_pop(); // pop condition value and execute then branch.
+        self.parse_with(Precedence::Ternary)?; // then branch.
+        let end_jump = self.emit_jump(Instruction::Jump(0));
+        self.patch_jump(then_jump);
+        self.emit_pop(); // pop condition value and try to execute else branch.
+
         self.consume_or_err(&COLON, "Expect ':' in ternary expression")?;
         self.parse_with(Precedence::Ternary)?;
-        self.emit_instr(Instruction::Ternary, tk.position)
+        self.patch_jump(end_jump);
+        Ok(())
     }
 
     fn and(&mut self) -> CompileResult<()> {

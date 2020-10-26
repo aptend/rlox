@@ -130,6 +130,16 @@ impl<'a> Compiler<'a> {
         }
     }
 
+    fn begin_scope(&mut self) {
+        self.resolver.begin_scope();
+    }
+
+    fn end_scope(&mut self) {
+        for _ in 0..self.resolver.end_scope() {
+            self.emit_pop();
+        }
+    }
+
     fn emit_return(&mut self, pos: Option<Position>) {
         let pos = match pos {
             Some(p) => p,
@@ -482,6 +492,62 @@ impl<'a> Compiler<'a> {
         Ok(())
     }
 
+    fn for_stmt(&mut self) -> CompileResult<()> {
+        self.begin_scope();
+        self.consume_or_err(&LEFT_PAREN, "Expect '(' after 'for'.")?;
+
+        // initializer clause
+        if self.advance_if_eq(&SEMICOLON).is_some() {
+        } else if self.advance_if_eq(&VAR).is_some() {
+            self.var_decl()?;
+        } else {
+            self.expression_stmt()?;
+        }
+
+        let mut loop_start = self.chunk.code.len();
+
+        // condition clause
+        let mut end_jump = None;
+        if self.advance_if_eq(&SEMICOLON).is_none() {
+            self.expression()?; // leave the value on the stack
+            self.consume_or_err(
+                &SEMICOLON,
+                "Expect ';' after loop condition.",
+            )?;
+            end_jump = Some(self.emit_jump(Instruction::JumpIfFalse(0)));
+            self.emit_pop();
+        }
+
+        match self.peek() {
+            Some(&TokenKind::RIGHT_PAREN) => (), // no increment
+            _ => {
+                // condition-true will fall through to the body
+                let body_jump = self.emit_jump(Instruction::Jump(0));
+                // when body ends, jump to here to execute increment clause
+                let inc_start = self.chunk.code.len();
+                // increment expression, use like a statement
+                self.expression()?;
+                self.emit_pop();
+
+                // when inc ends, jump to condition clause.
+                self.emit_loop(loop_start);
+                loop_start = inc_start;
+                self.patch_jump(body_jump);
+            }
+        }
+        self.consume_or_err(&RIGHT_PAREN, "Expect ')' after for clauses.")?;
+
+        self.statement()?;
+        self.emit_loop(loop_start);
+
+        if let Some(end_jump) = end_jump {
+            self.patch_jump(end_jump);
+            self.emit_pop();
+        }
+        self.end_scope();
+        Ok(())
+    }
+
     fn statement(&mut self) -> CompileResult<()> {
         if self.advance_if_eq(&PRINT).is_some() {
             self.print_stmt()
@@ -489,12 +555,12 @@ impl<'a> Compiler<'a> {
             self.if_stmt()
         } else if self.advance_if_eq(&WHILE).is_some() {
             self.while_stmt()
+        } else if self.advance_if_eq(&FOR).is_some() {
+            self.for_stmt()
         } else if self.advance_if_eq(&LEFT_BRACE).is_some() {
-            self.resolver.begin_scope();
+            self.begin_scope();
             self.block_stmt()?;
-            for _ in 0..self.resolver.end_scope() {
-                self.emit_pop();
-            }
+            self.end_scope();
             Ok(())
         } else {
             self.expression_stmt()

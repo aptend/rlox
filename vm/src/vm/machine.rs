@@ -69,7 +69,6 @@ impl<'a> Machine<'a> {
             self.ip += 1;
             match instr {
                 Instruction::Return => {
-                    // println!("{}", self.pop());
                     return Ok(());
                 }
                 Instruction::Pop => {

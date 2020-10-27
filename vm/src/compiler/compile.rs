@@ -67,14 +67,14 @@ pub struct Compiler<'a> {
 }
 
 impl<'a> Compiler<'a> {
-    pub fn new(scanner: Scanner<'a>, program_name: &str) -> Compiler<'a> {
+    pub fn new(scanner: Scanner<'a>) -> Compiler<'a> {
         Compiler {
             errors: Vec::new(),
             peeked: None,
             tokens: scanner,
             arena: Arena::default(),
             resolver: Resolver::default(),
-            chunk: Chunk::new(program_name),
+            chunk: Chunk::default(),
         }
     }
 
@@ -140,35 +140,29 @@ impl<'a> Compiler<'a> {
     }
 
     fn emit_return(&mut self, pos: Option<Position>) {
-        let pos = match pos {
-            Some(p) => p,
-            None => Position::default(),
-        };
         self.chunk.push_instr(Instruction::Return, pos);
     }
 
     fn emit_loop(&mut self, start: usize) {
         let offset = self.chunk.code.len() - start + 1;
-        self.chunk
-            .push_instr(Instruction::Loop(offset), Position::default());
+        self.chunk.push_instr(Instruction::Loop(offset), None);
     }
 
     fn emit_pop(&mut self) {
         // Pop never fails, it doesn't matter what the position is.
-        self.chunk.push_instr(Instruction::Pop, Position::default());
+        self.chunk.push_instr(Instruction::Pop, None);
     }
 
     // Emit a jump instruction, return its index for later patching.
     fn emit_jump(&mut self, instr: Instruction) -> usize {
         // max_value to make program panic if something is going wrong.
         let offset = usize::max_value();
-        let pos = Position::default();
         let instr = match instr {
             Instruction::Jump(_) => Instruction::Jump(offset),
             Instruction::JumpIfFalse(_) => Instruction::JumpIfFalse(offset),
             _ => panic!("wrong arg for emit_jump"),
         };
-        self.chunk.push_instr(instr, pos);
+        self.chunk.push_instr(instr, None);
         self.chunk.code.len() - 1
     }
 
@@ -189,7 +183,7 @@ impl<'a> Compiler<'a> {
         instr: Instruction,
         pos: Position,
     ) -> CompileResult<()> {
-        self.chunk.push_instr(instr, pos);
+        self.chunk.push_instr(instr, Some(pos));
         Ok(())
     }
 

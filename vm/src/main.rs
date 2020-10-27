@@ -33,7 +33,7 @@ fn run_file(filename: String) {
 
 fn run(source: &str) {
     let scanner = Scanner::new(source);
-    let mut compiler = Compiler::new(scanner, "EVA-01 Test Type");
+    let mut compiler = Compiler::new(scanner);
     let (chunk, arena) = match compiler.compile() {
         Ok(chunk) => chunk,
         Err(ref errs) => {

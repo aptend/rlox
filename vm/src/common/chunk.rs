@@ -82,37 +82,30 @@ impl fmt::Display for Instruction {
 
 #[derive(Default)]
 pub struct Chunk {
-    pub name: String,
     pub code: Vec<Instruction>,
     pub positions: Vec<Position>,
 }
 
 impl Chunk {
-    pub fn new(name: &str) -> Self {
-        Chunk {
-            name: name.to_string(),
-            code: vec![],
-            positions: vec![],
+
+    pub fn push_instr(&mut self, instr: Instruction, pos: Option<Position>) {
+        self.code.push(instr);
+        match pos {
+            Some(pos) => self.positions.push(pos),
+            None if self.positions.is_empty() => self.positions.push(Position::default()),
+            None => self.positions.push(*self.positions.last().unwrap()),
         }
     }
 
-    pub fn push_instr(&mut self, instr: Instruction, pos: Position) {
-        self.code.push(instr);
-        self.positions.push(pos);
-    }
-
     pub fn disassemble(&self) {
-        println!("===== {} =====\n", self.name);
         for offset in 0..self.code.len() {
             self.dis_instr(offset);
         }
     }
 
-    fn dis_instr(&self, offset: usize) {
+    pub fn dis_instr(&self, offset: usize) {
         let line = self.positions[offset].line;
-        if line == 0 {
-            println!("{:04}    * {}", offset, self.code[offset]);
-        } else if offset > 0 && line == self.positions[offset - 1].line {
+        if offset > 0 && line == self.positions[offset - 1].line {
             println!("{:04}    | {}", offset, self.code[offset]);
         } else {
             println!("{:04} {:>4} {}", offset, line, self.code[offset]);
@@ -133,15 +126,15 @@ mod test {
         let mut chunk = Chunk::new("test program");
         chunk.push_instr(
             Instruction::LoadConstant(Value::Number(1.2)),
-            Position::new(123, 1),
+            Some(Position::new(123, 1)),
         );
         chunk.push_instr(
             Instruction::LoadConstant(Value::Number(3.2)),
-            Position::new(123, 9),
+            Some(Position::new(123, 9)),
         );
 
-        chunk.push_instr(Instruction::Add, Position::new(123, 5));
-        chunk.push_instr(Instruction::Return, Position::new(124, 1));
+        chunk.push_instr(Instruction::Add, Some(Position::new(123, 5)));
+        chunk.push_instr(Instruction::Return, Some(Position::new(124, 1)));
         chunk.disassemble();
         // ===== test program =====
         // 0000  123 OP_LoadConstant      1.2

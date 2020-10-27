@@ -3,12 +3,14 @@
 mod arena;
 mod lox_string;
 mod value;
+mod chunk;
 
 use std::fmt;
 
 pub use arena::Arena;
 pub use lox_string::LoxString;
 pub use value::Value;
+pub use chunk::{Chunk, Instruction};
 
 #[derive(Clone, Debug, Copy, Eq, PartialEq, Default)]
 pub struct Position {

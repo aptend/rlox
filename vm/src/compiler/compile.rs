@@ -1,6 +1,5 @@
 use super::error::SyntaxError;
-use crate::chunk::*;
-use crate::common::{Arena, Position, Value};
+use crate::common::{Arena, Position, Value, Chunk, Instruction};
 use crate::scanner::*;
 
 use super::prec::Precedence;

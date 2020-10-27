@@ -1,6 +1,6 @@
 use std::fmt;
 
-use crate::common::{LoxString, Position, Value};
+use super::{LoxString, Position, Value};
 
 // Instructions run in a virtual machine, 16 byets
 pub enum Instruction {

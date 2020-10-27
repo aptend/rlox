@@ -85,7 +85,13 @@ impl<'a> Machine<'a> {
                     self.ip -= offset;
                 }
                 Instruction::Print => {
-                    println!("{}", self.pop());
+                    match self.pop() {
+                        // debug
+                        Value::Function(fun) => {
+                            fun.disassemble();
+                        }
+                        _ => println!("{}", self.pop()),
+                    }
                 }
                 Instruction::DefGlobal(key) => {
                     let val = self.pop();

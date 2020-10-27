@@ -69,7 +69,10 @@ impl Resolver {
     }
 
     pub fn mark_initialized(&mut self) {
-        // caller will make it safe to unwrap
+        if self.cur_depth == 0 {
+            // compile top-level recursive function will touch here.
+            return;
+        }
         self.locals.last_mut().unwrap().depth = Some(self.cur_depth);
     }
 }

@@ -1,6 +1,7 @@
 use super::error::SyntaxError;
 use crate::common::{
-    Arena, Chunk, Instruction, LoxFunInner, LoxFunction, Position, Value,
+    Arena, Chunk, Instruction, LoxFunInner, LoxFunction, LoxString, Position,
+    Value,
 };
 use crate::scanner::*;
 
@@ -90,9 +91,9 @@ impl CompileUnit {
         LoxFunction::new(LoxFunInner::new(self.arity, self.name, self.chunk))
     }
 
-    pub fn arity(mut self, arity: usize) -> Self {
+    // arity will be modified during parsing function declaration.
+    pub fn arity(&mut self, arity: usize) {
         self.arity = arity;
-        self
     }
 
     pub fn name(mut self, name: &str) -> Self {
@@ -134,7 +135,7 @@ impl<'a> Compiler<'a> {
         self.enclosing_units.push(unit);
     }
 
-    fn finish_unit(&mut self) -> LoxFunction {
+    fn end_unit(&mut self) -> LoxFunction {
         if self.enclosing_units.is_empty() {
             let unit = mem::take(&mut self.unit);
             unit.end_compile()
@@ -201,10 +202,6 @@ impl<'a> Compiler<'a> {
         for _ in 0..self.unit.resolver.end_scope() {
             self.emit_pop();
         }
-    }
-
-    fn emit_return(&mut self, pos: Option<Position>) {
-        self.unit.chunk.push_instr(Instruction::Return, pos);
     }
 
     fn emit_loop(&mut self, start: usize) {
@@ -450,7 +447,7 @@ impl<'a> Compiler<'a> {
             Some(&TokenKind::QUESTION) => self.ternary(),
             Some(&TokenKind::AND) => self.and(),
             Some(&TokenKind::OR) => self.or(),
-            _ => unreachable!(),
+            _ => unreachable!("{:?}", self.peek()),
         }
     }
 
@@ -460,21 +457,46 @@ impl<'a> Compiler<'a> {
     // ----------------------------------------------------------------------
     // ----------------------------------------------------------------------
 
+    /// Declare a variable, if it is a global variable, return a Some(LoxString),
+    /// otherwise, return None
+    fn declare_variable(
+        &mut self,
+        tk: &Token,
+    ) -> CompileResult<Option<LoxString>> {
+        if self.unit.resolver.is_local_ready() {
+            if self.unit.resolver.declare_variable(tk.as_str()) {
+                Ok(None)
+            } else {
+                Err(SyntaxError::new_compiler_err(
+                    Some(tk.clone()),
+                    "Already variable with this name in this scope.",
+                ))
+            }
+        } else {
+            Ok(Some(self.arena.alloc_string_ref(tk.as_str())))
+        }
+    }
+
+    /// Define a variable, if it is a global variable, emits a Instruction::DefineGlobal,
+    /// otherwise, mark the local variable initialized.
+    fn define_variable(
+        &mut self,
+        identifier: Option<LoxString>,
+        pos: Position,
+    ) -> CompileResult<()> {
+        if let Some(identifier) = identifier {
+            self.emit_instr(Instruction::DefGlobal(identifier), pos)?;
+        } else {
+            self.unit.resolver.mark_initialized();
+        }
+        Ok(())
+    }
+
     fn var_decl(&mut self) -> CompileResult<()> {
         let tk = self.consume_or_err(&IDENTIFIER, "Expect variable name")?;
-        // declareVariable in clox
-        let ident = if self.unit.resolver.is_local_ready() {
-            if !self.unit.resolver.declare_variable(tk.as_str()) {
-                return Err(SyntaxError::new_compiler_err(
-                    Some(tk),
-                    "Already variable with this name in this scope.",
-                ));
-            }
-            None
-        } else {
-            Some(self.arena.alloc_string_ref(tk.as_str()))
-        };
-        // initializer
+        let identifier = self.declare_variable(&tk)?;
+
+        // eval the initializer on the stack top
         if self.advance_if_eq(&EQUAL).is_some() {
             self.expression()?;
         } else {
@@ -484,12 +506,64 @@ impl<'a> Compiler<'a> {
             &SEMICOLON,
             "Expect ';' after variable declaration.",
         )?;
-        if let Some(identifier) = ident {
-            self.emit_instr(Instruction::DefGlobal(identifier), tk.position)?;
-        } else {
-            self.unit.resolver.mark_initialized();
+        self.define_variable(identifier, tk.position)
+    }
+
+    fn function(
+        &mut self,
+        name: &Token,
+        kind: FunctionKind,
+    ) -> CompileResult<()> {
+        self.begin_unit(name.as_str(), kind);
+        self.begin_scope(); // create function local scope
+        self.consume_or_err(&LEFT_PAREN, "Expect '(' after function name.")?;
+        
+        // handle param list
+        let mut arity = 0;
+        if self.peek_check(|k| k != &*RIGHT_PAREN) {
+            loop {
+                arity += 1;
+                if arity >= 255 {
+                    let err = SyntaxError::new_compiler_err(
+                        Some(name.clone()),
+                        "Can't have more than 255 parameters.",
+                    );
+                    self.errors.push(err);
+                }
+                // reserve positions on frame stack for local variables(parameters)
+                let tk =
+                    self.consume_or_err(&IDENTIFIER, "Expect parameter name.")?;
+                let identifier = self.declare_variable(&tk)?;
+                self.define_variable(identifier, tk.position)?;
+                if self.advance_if_eq(&COMMA).is_none() {
+                    break;
+                }
+            }
         }
-        Ok(())
+        self.unit.arity(arity);
+
+        self.consume_or_err(&RIGHT_PAREN, "Expect ')' after parameters.")?;
+
+        // emit bytecodes of the body to the new unit.
+        self.consume_or_err(&LEFT_BRACE, "Expect '{' before function body.")?;
+        self.block_stmt()?;
+
+        self.end_scope();
+        let function = self.end_unit();
+        self.emit_instr(
+            Instruction::LoadConstant(Value::Function(function)),
+            name.position,
+        )
+    }
+
+    fn func_decl(&mut self) -> CompileResult<()> {
+        let tk = self.consume_or_err(&IDENTIFIER, "Expect function name")?;
+        let identifier = self.declare_variable(&tk)?;
+        // mark it initialized early to support recursive call.
+        self.unit.resolver.mark_initialized();
+        // eval LoxFunction on the stacktop
+        self.function(&tk, FunctionKind::Function)?;
+        self.define_variable(identifier, tk.position)
     }
 
     fn print_stmt(&mut self) -> CompileResult<()> {
@@ -627,6 +701,8 @@ impl<'a> Compiler<'a> {
     fn declaration(&mut self) -> CompileResult<()> {
         if self.advance_if_eq(&VAR).is_some() {
             self.var_decl()
+        } else if self.advance_if_eq(&FUN).is_some() {
+            self.func_decl()
         } else {
             self.statement()
         }
@@ -664,8 +740,7 @@ impl<'a> Compiler<'a> {
             }
         }
         if self.errors.is_empty() {
-            self.emit_return(None);
-            Ok((self.finish_unit(), mem::take(&mut self.arena)))
+            Ok((self.end_unit(), mem::take(&mut self.arena)))
         } else {
             Err(mem::take(&mut self.errors))
         }

@@ -1,16 +1,18 @@
 //! Structs bridging comipiling and executing
 
 mod arena;
+mod chunk;
+mod lox_function;
 mod lox_string;
 mod value;
-mod chunk;
 
 use std::fmt;
 
 pub use arena::Arena;
+pub use chunk::{Chunk, Instruction};
+pub use lox_function::{LoxFunInner, LoxFunction};
 pub use lox_string::LoxString;
 pub use value::Value;
-pub use chunk::{Chunk, Instruction};
 
 #[derive(Clone, Debug, Copy, Eq, PartialEq, Default)]
 pub struct Position {

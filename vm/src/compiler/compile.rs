@@ -1,5 +1,7 @@
 use super::error::SyntaxError;
-use crate::common::{Arena, Position, Value, Chunk, Instruction};
+use crate::common::{
+    Arena, Chunk, Instruction, LoxFunInner, LoxFunction, Position, Value,
+};
 use crate::scanner::*;
 
 use super::prec::Precedence;
@@ -57,13 +59,61 @@ lazy_static! {
     static ref COLON: TokenKind = TokenKind::COLON;
 }
 
+/// FunctionType helps with addressing syntax errors like return from top-level.
+enum FunctionKind {
+    // main function
+    Script,
+    Function,
+}
+
+impl std::default::Default for FunctionKind {
+    fn default() -> Self {
+        FunctionKind::Script
+    }
+}
+
+/// A helper unit for compiling a function, including components of LoxFunction
+/// and a dedicated Resolver.
+#[derive(Default)]
+struct CompileUnit {
+    arity: usize,
+    name: Option<String>,
+    chunk: Chunk,
+    kind: FunctionKind,
+    resolver: Resolver,
+}
+
+impl CompileUnit {
+    pub fn end_compile(mut self) -> LoxFunction {
+        self.chunk.push_instr(Instruction::Nil, None);
+        self.chunk.push_instr(Instruction::Return, None);
+        LoxFunction::new(LoxFunInner::new(self.arity, self.name, self.chunk))
+    }
+
+    pub fn arity(mut self, arity: usize) -> Self {
+        self.arity = arity;
+        self
+    }
+
+    pub fn name(mut self, name: &str) -> Self {
+        self.name = Some(name.to_string());
+        self
+    }
+
+    pub fn kind(mut self, kind: FunctionKind) -> Self {
+        self.kind = kind;
+        self
+    }
+}
+
 pub struct Compiler<'a> {
     errors: Vec<SyntaxError>,
     peeked: Option<Token>,
     tokens: Scanner<'a>,
     arena: Arena,
-    resolver: Resolver,
-    chunk: Chunk,
+    // current working unit
+    unit: CompileUnit,
+    enclosing_units: Vec<CompileUnit>,
 }
 
 impl<'a> Compiler<'a> {
@@ -73,8 +123,25 @@ impl<'a> Compiler<'a> {
             peeked: None,
             tokens: scanner,
             arena: Arena::default(),
-            resolver: Resolver::default(),
-            chunk: Chunk::default(),
+            unit: CompileUnit::default(),
+            enclosing_units: vec![],
+        }
+    }
+
+    fn begin_unit(&mut self, name: &str, kind: FunctionKind) {
+        let mut unit = CompileUnit::default().name(name).kind(kind);
+        mem::swap(&mut self.unit, &mut unit);
+        self.enclosing_units.push(unit);
+    }
+
+    fn finish_unit(&mut self) -> LoxFunction {
+        if self.enclosing_units.is_empty() {
+            let unit = mem::take(&mut self.unit);
+            unit.end_compile()
+        } else {
+            let mut unit = self.enclosing_units.pop().unwrap();
+            mem::swap(&mut self.unit, &mut unit);
+            unit.end_compile()
         }
     }
 
@@ -83,16 +150,13 @@ impl<'a> Compiler<'a> {
             self.peeked.take()
         } else {
             // loop to find one valid token
-            loop {
-                if let Some(res) = self.tokens.next() {
-                    match res {
-                        Ok(token) => return Some(token),
-                        Err(e) => self.errors.push(e.into()),
-                    }
-                } else {
-                    return None;
+            while let Some(res) = self.tokens.next() {
+                match res {
+                    Ok(token) => return Some(token),
+                    Err(e) => self.errors.push(e.into()),
                 }
             }
+            return None;
         }
     }
 
@@ -130,27 +194,27 @@ impl<'a> Compiler<'a> {
     }
 
     fn begin_scope(&mut self) {
-        self.resolver.begin_scope();
+        self.unit.resolver.begin_scope();
     }
 
     fn end_scope(&mut self) {
-        for _ in 0..self.resolver.end_scope() {
+        for _ in 0..self.unit.resolver.end_scope() {
             self.emit_pop();
         }
     }
 
     fn emit_return(&mut self, pos: Option<Position>) {
-        self.chunk.push_instr(Instruction::Return, pos);
+        self.unit.chunk.push_instr(Instruction::Return, pos);
     }
 
     fn emit_loop(&mut self, start: usize) {
-        let offset = self.chunk.code.len() - start + 1;
-        self.chunk.push_instr(Instruction::Loop(offset), None);
+        let offset = self.unit.chunk.code.len() - start + 1;
+        self.unit.chunk.push_instr(Instruction::Loop(offset), None);
     }
 
     fn emit_pop(&mut self) {
         // Pop never fails, it doesn't matter what the position is.
-        self.chunk.push_instr(Instruction::Pop, None);
+        self.unit.chunk.push_instr(Instruction::Pop, None);
     }
 
     // Emit a jump instruction, return its index for later patching.
@@ -162,15 +226,15 @@ impl<'a> Compiler<'a> {
             Instruction::JumpIfFalse(_) => Instruction::JumpIfFalse(offset),
             _ => panic!("wrong arg for emit_jump"),
         };
-        self.chunk.push_instr(instr, None);
-        self.chunk.code.len() - 1
+        self.unit.chunk.push_instr(instr, None);
+        self.unit.chunk.code.len() - 1
     }
 
     // Patch the jump instruction at index, update its offset to the current
     // address.
     fn patch_jump(&mut self, index: usize) {
-        let offset = self.chunk.code.len() - index - 1;
-        let instr = self.chunk.code.get_mut(index).unwrap();
+        let offset = self.unit.chunk.code.len() - index - 1;
+        let instr = self.unit.chunk.code.get_mut(index).unwrap();
         *instr = match *instr {
             Instruction::JumpIfFalse(_) => Instruction::JumpIfFalse(offset),
             Instruction::Jump(_) => Instruction::Jump(offset),
@@ -183,7 +247,7 @@ impl<'a> Compiler<'a> {
         instr: Instruction,
         pos: Position,
     ) -> CompileResult<()> {
-        self.chunk.push_instr(instr, Some(pos));
+        self.unit.chunk.push_instr(instr, Some(pos));
         Ok(())
     }
 
@@ -202,7 +266,7 @@ impl<'a> Compiler<'a> {
 
         let get_op;
         let set_op;
-        if let Some(idx) = self.resolver.resolve_variale(tk.as_str()) {
+        if let Some(idx) = self.unit.resolver.resolve_variale(tk.as_str()) {
             get_op = Instruction::GetLocal(idx);
             set_op = Instruction::SetLocal(idx);
         } else {
@@ -399,8 +463,8 @@ impl<'a> Compiler<'a> {
     fn var_decl(&mut self) -> CompileResult<()> {
         let tk = self.consume_or_err(&IDENTIFIER, "Expect variable name")?;
         // declareVariable in clox
-        let ident = if self.resolver.is_local_ready() {
-            if !self.resolver.declare_variable(tk.as_str()) {
+        let ident = if self.unit.resolver.is_local_ready() {
+            if !self.unit.resolver.declare_variable(tk.as_str()) {
                 return Err(SyntaxError::new_compiler_err(
                     Some(tk),
                     "Already variable with this name in this scope.",
@@ -423,7 +487,7 @@ impl<'a> Compiler<'a> {
         if let Some(identifier) = ident {
             self.emit_instr(Instruction::DefGlobal(identifier), tk.position)?;
         } else {
-            self.resolver.mark_initialized();
+            self.unit.resolver.mark_initialized();
         }
         Ok(())
     }
@@ -471,7 +535,7 @@ impl<'a> Compiler<'a> {
     }
 
     fn while_stmt(&mut self) -> CompileResult<()> {
-        let loop_start = self.chunk.code.len();
+        let loop_start = self.unit.chunk.code.len();
         self.consume_or_err(&LEFT_PAREN, "Expect '(' after 'while'.")?;
         self.expression()?;
         self.consume_or_err(&RIGHT_PAREN, "Expect ')' after condition.")?;
@@ -497,7 +561,7 @@ impl<'a> Compiler<'a> {
             self.expression_stmt()?;
         }
 
-        let mut loop_start = self.chunk.code.len();
+        let mut loop_start = self.unit.chunk.code.len();
 
         // condition clause
         let mut end_jump = None;
@@ -517,7 +581,7 @@ impl<'a> Compiler<'a> {
                 // condition-true will fall through to the body
                 let body_jump = self.emit_jump(Instruction::Jump(0));
                 // when body ends, jump to here to execute increment clause
-                let inc_start = self.chunk.code.len();
+                let inc_start = self.unit.chunk.code.len();
                 // increment expression, use like a statement
                 self.expression()?;
                 self.emit_pop();
@@ -590,7 +654,9 @@ impl<'a> Compiler<'a> {
         }
     }
 
-    pub fn compile(&mut self) -> Result<(Chunk, Arena), Vec<SyntaxError>> {
+    pub fn compile(
+        &mut self,
+    ) -> Result<(LoxFunction, Arena), Vec<SyntaxError>> {
         while self.peek().is_some() {
             if let Err(e) = self.declaration() {
                 self.errors.push(e);
@@ -599,7 +665,7 @@ impl<'a> Compiler<'a> {
         }
         if self.errors.is_empty() {
             self.emit_return(None);
-            Ok((mem::take(&mut self.chunk), mem::take(&mut self.arena)))
+            Ok((self.finish_unit(), mem::take(&mut self.arena)))
         } else {
             Err(mem::take(&mut self.errors))
         }

@@ -1,4 +1,4 @@
-use crate::common::{Arena, Position, Value, Chunk, Instruction};
+use crate::common::{Arena, Chunk, Instruction, Position, Value};
 
 use super::error::RuntimeError;
 

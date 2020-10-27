@@ -87,12 +87,13 @@ pub struct Chunk {
 }
 
 impl Chunk {
-
     pub fn push_instr(&mut self, instr: Instruction, pos: Option<Position>) {
         self.code.push(instr);
         match pos {
             Some(pos) => self.positions.push(pos),
-            None if self.positions.is_empty() => self.positions.push(Position::default()),
+            None if self.positions.is_empty() => {
+                self.positions.push(Position::default())
+            }
             None => self.positions.push(*self.positions.last().unwrap()),
         }
     }

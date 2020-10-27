@@ -1,13 +1,14 @@
-use super::lox_string::LoxString;
+use super::{LoxFunction, LoxString};
 
 use std::fmt;
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Clone, PartialEq)]
 pub enum Value {
     Nil,
     Number(f64),
     Boolean(bool),
     String(LoxString),
+    Function(LoxFunction),
 }
 
 impl fmt::Display for Value {
@@ -17,6 +18,7 @@ impl fmt::Display for Value {
             Value::Nil => write!(f, "nil"),
             Value::Boolean(b) => write!(f, "{}", b),
             Value::String(s) => write!(f, "{}", s),
+            Value::Function(fun) => write!(f, "{}", fun),
         }
     }
 }

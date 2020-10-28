@@ -43,7 +43,7 @@ fn run(source: &str) {
             return;
         }
     };
-    main_func.disassemble();
+    // main_func.disassemble();
     let mut vm = Machine::new(main_func, arena);
     if let Err(ref e) = vm.run() {
         println!("{}", e);

@@ -61,6 +61,7 @@ lazy_static! {
 }
 
 /// FunctionType helps with addressing syntax errors like return from top-level.
+#[derive(Debug, Eq, PartialEq)]
 enum FunctionKind {
     // main function
     Script,
@@ -709,6 +710,19 @@ impl<'a> Compiler<'a> {
         Ok(())
     }
 
+    fn return_stmt(&mut self) -> CompileResult<()> {
+        // TODO: clean up the scattered `push_instr` and `emit_instr`
+        if self.advance_if_eq(&SEMICOLON).is_some() {
+            self.unit.chunk.push_instr(Instruction::Nil, None);
+            self.unit.chunk.push_instr(Instruction::Return, None);
+        } else {
+            self.expression()?;
+            self.consume_or_err(&SEMICOLON, "Expect ';' after return value.")?;
+            self.unit.chunk.push_instr(Instruction::Return, None);
+        }
+        Ok(())
+    }
+
     fn statement(&mut self) -> CompileResult<()> {
         if self.advance_if_eq(&PRINT).is_some() {
             self.print_stmt()
@@ -718,6 +732,14 @@ impl<'a> Compiler<'a> {
             self.while_stmt()
         } else if self.advance_if_eq(&FOR).is_some() {
             self.for_stmt()
+        } else if let Some(tk) = self.advance_if_eq(&RETURN) {
+            if self.unit.kind == FunctionKind::Script {
+                return Err(SyntaxError::new_compiler_err(
+                    Some(tk),
+                    "Can't return from top-level code.",
+                ));
+            }
+            self.return_stmt()
         } else if self.advance_if_eq(&LEFT_BRACE).is_some() {
             self.begin_scope();
             self.block_stmt()?;

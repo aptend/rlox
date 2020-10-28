@@ -395,6 +395,35 @@ impl<'a> Compiler<'a> {
         Ok(())
     }
 
+    fn argument_list(&mut self, tk: &Token) -> CompileResult<usize> {
+        let mut arg_count = 0;
+
+        if self.peek_check(|kind| kind != &*RIGHT_PAREN) {
+            loop {
+                self.expression()?;
+                arg_count += 1;
+                if arg_count >= 255 {
+                    let err = SyntaxError::new_compiler_err(
+                        Some(tk.clone()),
+                        "Can't have more than 255 arguments.",
+                    );
+                    self.errors.push(err);
+                }
+                if self.advance_if_eq(&COMMA).is_none() {
+                    break;
+                }
+            }
+        }
+        self.consume_or_err(&RIGHT_PAREN, "Expect ')' after parameters.")?;
+        Ok(arg_count)
+    }
+
+    fn call(&mut self) -> CompileResult<()> {
+        let tk = self.advance().unwrap(); // left paren
+        let arg_count = self.argument_list(&tk)?;
+        self.emit_instr(Instruction::Call(arg_count), tk.position)
+    }
+
     fn parse_with(&mut self, prec: Precedence) -> CompileResult<()> {
         let can_assign = prec <= Precedence::Assign;
         self.dispatch_prefix(can_assign)?;
@@ -447,6 +476,7 @@ impl<'a> Compiler<'a> {
             Some(&TokenKind::QUESTION) => self.ternary(),
             Some(&TokenKind::AND) => self.and(),
             Some(&TokenKind::OR) => self.or(),
+            Some(&TokenKind::LEFT_PAREN) => self.call(),
             _ => unreachable!("{:?}", self.peek()),
         }
     }

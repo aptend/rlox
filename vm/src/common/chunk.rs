@@ -14,6 +14,7 @@ pub enum Instruction {
     GetLocal(usize),
     SetLocal(usize),
     Print,
+    Call(usize),
 
     Jump(usize),
     JumpIfFalse(usize),
@@ -55,6 +56,9 @@ impl fmt::Display for Instruction {
             }
             Instruction::LoadConstant(c) => {
                 write!(f, "{:20} {}", "OP_LoadConstant", c)
+            }
+            Instruction::Call(n) => {
+                write!(f, "{:20} arg_count:{}", "OP_Call", n)
             }
             Instruction::Jump(n) => write!(f, "{:20} +{}", "OP_Jump", n + 1),
             Instruction::JumpIfFalse(n) => {

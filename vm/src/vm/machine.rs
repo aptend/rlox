@@ -1,4 +1,4 @@
-use crate::common::{Arena, Chunk, Instruction, Position, Value};
+use crate::common::{Arena, Instruction, LoxFunction, Position, Value};
 
 use super::error::RuntimeError;
 
@@ -9,22 +9,47 @@ type VmResult<T> = Result<T, RuntimeError>;
 
 const STACK_MAX: usize = 256;
 
-pub struct Machine<'a> {
-    code: &'a [Instruction],
-    positions: &'a [Position],
-    arena: Arena,
+struct CallFrame {
+    function: LoxFunction,
+    // instruction pointer
     ip: usize,
+    // frame pointer
+    fp: usize,
+}
+
+impl CallFrame {
+    pub fn new(function: LoxFunction, ip: usize, fp: usize) -> Self {
+        CallFrame { function, ip, fp }
+    }
+
+    #[inline(always)]
+    fn positions(&self) -> &[Position] {
+        &self.function.chunk().positions
+    }
+
+    #[inline(always)]
+    fn code(&self) -> &[Instruction] {
+        &self.function.chunk().code
+    }
+}
+
+pub struct Machine {
+    // TODO: run a test for the dedicated current frame solution.
+    frame: CallFrame,
+    // FIXME: will it be faster to allocate CallFrame on stack?
+    enclosing_frames: Vec<CallFrame>,
+
+    arena: Arena,
     stack: Vec<Value>,
 }
 
-impl<'a> Machine<'a> {
-    pub fn new(chunk: &'a Chunk, arena: Arena) -> Self {
+impl Machine {
+    pub fn new(function: LoxFunction, arena: Arena) -> Self {
         Machine {
-            code: &chunk.code,
-            positions: &chunk.positions,
+            frame: CallFrame::new(function.clone(), 0, 0),
+            enclosing_frames: Vec::with_capacity(64),
             arena,
-            ip: 0,
-            stack: vec![],
+            stack: vec![Value::Function(function)],
         }
     }
 
@@ -45,8 +70,55 @@ impl<'a> Machine<'a> {
     }
 
     fn runtime_err(&self, args: Arguments) -> VmResult<()> {
-        let pos = self.positions[self.ip - 1];
+        let pos = self.frame.positions()[self.frame.ip - 1];
         Err(RuntimeError::new(pos, format(args)))
+    }
+
+    #[inline(always)]
+    fn read_instr(&mut self) -> *const Instruction {
+        let instr = &self.frame.code()[self.frame.ip] as *const Instruction;
+        self.frame.ip += 1;
+        instr
+    }
+
+    fn _debug_stack(&self) {
+        if self.stack.is_empty() {
+            println!("[]");
+        } else {
+            print!("[");
+            for v in &self.stack {
+                print!(" {}", v);
+            }
+            println!(" ]");
+        }
+    }
+
+    fn call_value(&mut self, value: Value, arg_count: usize) -> VmResult<()> {
+        match value {
+            Value::Function(function) => self.call(function, arg_count),
+            _ => {
+                self.runtime_err(args!("Can only call functions and classes."))
+            }
+        }
+    }
+
+    fn call(
+        &mut self,
+        function: LoxFunction,
+        arg_count: usize,
+    ) -> VmResult<()> {
+        if arg_count != function.arity() {
+            return self.runtime_err(args!(
+                "Expected {} arguments but got {}.",
+                function.arity(),
+                arg_count
+            ));
+        }
+        let mut frame =
+            CallFrame::new(function, 0, self.stack.len() - arg_count - 1);
+        std::mem::swap(&mut self.frame, &mut frame);
+        self.enclosing_frames.push(frame);
+        Ok(())
     }
 
     pub fn run(&mut self) -> VmResult<()> {
@@ -61,28 +133,45 @@ impl<'a> Machine<'a> {
             }
         }
         loop {
-            let instr = &self.code[self.ip];
+            let instr = self.read_instr();
             // for debug
             // println!("{}", instr);
-            // println!(" {:?}\n", self.stack);
-            self.ip += 1;
-            match instr {
+            // self._debug_stack();
+
+            // Use unsafe to circumvent borrow checker, as we can tell that
+            // the muttable parts (frame.ip, starck etc.) will not affect
+            // the memory of Instruction.
+            // TODO: Of course, we could design a struct RunningCallFrame<'a> to
+            // eliminate the unsafe code
+            match unsafe { &*instr } {
                 Instruction::Return => {
-                    return Ok(());
+                    let result = self.pop();
+                    if self.enclosing_frames.is_empty() {
+                        // return from __main__ entry function
+                        self.pop();
+                        return Ok(());
+                    } else {
+                        // drop local variables of callee function
+                        self.stack.drain(self.frame.fp..);
+                        self.push(result);
+
+                        let mut frame = self.enclosing_frames.pop().unwrap();
+                        std::mem::swap(&mut self.frame, &mut frame);
+                    }
                 }
                 Instruction::Pop => {
                     self.pop();
                 }
                 Instruction::Jump(offset) => {
-                    self.ip += offset;
+                    self.frame.ip += offset;
                 }
                 Instruction::JumpIfFalse(offset) => {
                     if !self.peek(0).is_truthy() {
-                        self.ip += offset;
+                        self.frame.ip += offset;
                     }
                 }
                 Instruction::Loop(offset) => {
-                    self.ip -= offset;
+                    self.frame.ip -= offset;
                 }
                 Instruction::Print => {
                     match self.pop() {
@@ -90,8 +179,12 @@ impl<'a> Machine<'a> {
                         Value::Function(fun) => {
                             fun.disassemble();
                         }
-                        _ => println!("{}", self.pop()),
+                        v => println!("{}", v),
                     }
+                }
+                Instruction::Call(arg_count) => {
+                    let callee = self.peek(*arg_count).clone();
+                    self.call_value(callee, *arg_count)?;
                 }
                 Instruction::DefGlobal(key) => {
                     let val = self.pop();
@@ -121,11 +214,11 @@ impl<'a> Machine<'a> {
                     }
                 }
                 Instruction::GetLocal(idx) => {
-                    let val = self.stack[*idx].clone();
+                    let val = self.stack[*idx + self.frame.fp].clone();
                     self.push(val);
                 }
                 Instruction::SetLocal(idx) => {
-                    self.stack[*idx] = self.peek(0).clone();
+                    self.stack[*idx + self.frame.fp] = self.peek(0).clone();
                 }
                 Instruction::Negate => match self.pop() {
                     Value::Number(f) => self.push(Value::Number(-f)),

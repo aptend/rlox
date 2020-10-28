@@ -157,7 +157,7 @@ impl<'a> Compiler<'a> {
                     Err(e) => self.errors.push(e.into()),
                 }
             }
-            return None;
+            None
         }
     }
 
@@ -517,7 +517,7 @@ impl<'a> Compiler<'a> {
         self.begin_unit(name.as_str(), kind);
         self.begin_scope(); // create function local scope
         self.consume_or_err(&LEFT_PAREN, "Expect '(' after function name.")?;
-        
+
         // handle param list
         let mut arity = 0;
         if self.peek_check(|k| k != &*RIGHT_PAREN) {

@@ -6,6 +6,7 @@ use std::rc::Rc;
 #[derive(Default)]
 pub struct LoxFunInner {
     arity: usize,
+    // FIXME: why not give the top-level function a name, like '__main__'?
     name: Option<String>,
     chunk: Chunk,
 }
@@ -30,8 +31,14 @@ impl LoxFunction {
         self.0.chunk.disassemble();
     }
 
+    #[inline(always)]
     pub fn chunk(&self) -> &Chunk {
         &self.0.chunk
+    }
+
+    #[inline(always)]
+    pub fn arity(&self) -> usize {
+        self.0.arity
     }
 }
 

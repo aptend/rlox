@@ -3,10 +3,22 @@ struct Local {
     depth: Option<usize>,
 }
 
-#[derive(Default)]
 pub struct Resolver {
     locals: Vec<Local>,
     cur_depth: usize,
+}
+
+impl std::default::Default for Resolver {
+    fn default() -> Self {
+        Resolver {
+            // Every function has a reserved local variable position for VM use
+            locals: vec![Local {
+                name: "".to_string(),
+                depth: Some(0),
+            }],
+            cur_depth: 0,
+        }
+    }
 }
 
 impl Resolver {

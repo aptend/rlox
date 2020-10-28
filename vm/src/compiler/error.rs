@@ -35,9 +35,7 @@ impl fmt::Display for CompileError {
             Some(tk) => write!(
                 f,
                 "{} SyntaxError at '{}': {}",
-                tk.position,
-                tk.as_str(),
-                self.msg
+                tk.position, tk, self.msg
             ),
             None => write!(
                 f,

@@ -1,4 +1,4 @@
-use crate::common::{Arena, Instruction, LoxFunction, Position, Value};
+use crate::common::{Arena, Instruction, LoxFunction, Position, Value, NATIVECLOCK};
 
 use super::error::RuntimeError;
 
@@ -44,7 +44,10 @@ pub struct Machine {
 }
 
 impl Machine {
-    pub fn new(function: LoxFunction, arena: Arena) -> Self {
+    pub fn new(function: LoxFunction, mut arena: Arena) -> Self {
+        let clock = NATIVECLOCK.with(|c| c.clone());
+        let key = arena.alloc_string_ref(clock.name());
+        arena.set_global(key, Value::NativeFn(clock));
         Machine {
             frame: CallFrame::new(function.clone(), 0, 0),
             enclosing_frames: Vec::with_capacity(64),
@@ -96,9 +99,28 @@ impl Machine {
     fn call_value(&mut self, value: Value, arg_count: usize) -> VmResult<()> {
         match value {
             Value::Function(function) => self.call(function, arg_count),
+            Value::NativeFn(fun) => {
+                self.check_arity(arg_count, fun.arity())?;
+                let offset = self.stack.len() - arg_count;
+                let result = fun.code()(&self.stack[offset..]);
+                self.push(result);
+                Ok(())
+            }
             _ => {
                 self.runtime_err(args!("Can only call functions and classes."))
             }
+        }
+    }
+
+    fn check_arity(&self, arg_count: usize, arity:usize) -> VmResult<()> {
+        if arg_count != arity {
+            self.runtime_err(args!(
+                "Expected {} arguments but got {}.",
+                arity,
+                arg_count
+            ))
+        } else {
+            Ok(())
         }
     }
 
@@ -107,13 +129,7 @@ impl Machine {
         function: LoxFunction,
         arg_count: usize,
     ) -> VmResult<()> {
-        if arg_count != function.arity() {
-            return self.runtime_err(args!(
-                "Expected {} arguments but got {}.",
-                function.arity(),
-                arg_count
-            ));
-        }
+        self.check_arity(arg_count, function.arity())?;
         let mut frame =
             CallFrame::new(function, 0, self.stack.len() - arg_count - 1);
         std::mem::swap(&mut self.frame, &mut frame);

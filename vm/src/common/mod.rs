@@ -2,6 +2,7 @@
 
 mod arena;
 mod chunk;
+mod lox_closure;
 mod lox_function;
 mod lox_string;
 mod native_fn;
@@ -11,6 +12,7 @@ use std::fmt;
 
 pub use arena::Arena;
 pub use chunk::{Chunk, Instruction};
+pub use lox_closure::LoxClosure;
 pub use lox_function::{LoxFunInner, LoxFunction};
 pub use lox_string::LoxString;
 pub use native_fn::{NATIVECLOCK, NativeFunction};

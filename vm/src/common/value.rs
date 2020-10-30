@@ -1,4 +1,4 @@
-use super::{LoxFunction, LoxString, NativeFunction};
+use super::{LoxClosure, LoxString, NativeFunction};
 
 use std::fmt;
 
@@ -8,7 +8,7 @@ pub enum Value {
     Number(f64),
     Boolean(bool),
     String(LoxString),
-    Function(LoxFunction),
+    Closure(LoxClosure),
     NativeFn(NativeFunction)
 }
 
@@ -19,7 +19,7 @@ impl fmt::Display for Value {
             Value::Nil => write!(f, "nil"),
             Value::Boolean(b) => write!(f, "{}", b),
             Value::String(s) => write!(f, "{}", s),
-            Value::Function(fun) => write!(f, "{}", fun),
+            Value::Closure(c) => write!(f, "{}", c),
             Value::NativeFn(fun) => write!(f, "{}", fun),
         }
     }

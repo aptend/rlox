@@ -1,4 +1,4 @@
-use crate::common::{Arena, Instruction, LoxFunction, Position, Value, NATIVECLOCK};
+use crate::common::{Arena, Instruction, LoxFunction, LoxClosure, Position, Value, NATIVECLOCK};
 
 use super::error::RuntimeError;
 
@@ -10,7 +10,7 @@ type VmResult<T> = Result<T, RuntimeError>;
 const STACK_MAX: usize = 256;
 
 struct CallFrame {
-    function: LoxFunction,
+    closure: LoxClosure,
     // instruction pointer
     ip: usize,
     // frame pointer
@@ -18,18 +18,18 @@ struct CallFrame {
 }
 
 impl CallFrame {
-    pub fn new(function: LoxFunction, ip: usize, fp: usize) -> Self {
-        CallFrame { function, ip, fp }
+    pub fn new(closure: LoxClosure, ip: usize, fp: usize) -> Self {
+        CallFrame { closure: closure, ip, fp }
     }
 
     #[inline(always)]
     fn positions(&self) -> &[Position] {
-        &self.function.chunk().positions
+        &self.closure.function().chunk().positions
     }
 
     #[inline(always)]
     fn code(&self) -> &[Instruction] {
-        &self.function.chunk().code
+        &self.closure.function().chunk().code
     }
 }
 
@@ -48,11 +48,13 @@ impl Machine {
         let clock = NATIVECLOCK.with(|c| c.clone());
         let key = arena.alloc_string_ref(clock.name());
         arena.set_global(key, Value::NativeFn(clock));
+
+        let init_closure = LoxClosure::new(function);
         Machine {
-            frame: CallFrame::new(function.clone(), 0, 0),
+            frame: CallFrame::new(init_closure.clone(), 0, 0),
             enclosing_frames: Vec::with_capacity(64),
             arena,
-            stack: vec![Value::Function(function)],
+            stack: vec![Value::Closure(init_closure)],
         }
     }
 
@@ -98,7 +100,7 @@ impl Machine {
 
     fn call_value(&mut self, value: Value, arg_count: usize) -> VmResult<()> {
         match value {
-            Value::Function(function) => self.call(function, arg_count),
+            Value::Closure(closure) => self.call(closure, arg_count),
             Value::NativeFn(fun) => {
                 self.check_arity(arg_count, fun.arity())?;
                 let offset = self.stack.len() - arg_count;
@@ -126,12 +128,12 @@ impl Machine {
 
     fn call(
         &mut self,
-        function: LoxFunction,
+        closure: LoxClosure,
         arg_count: usize,
     ) -> VmResult<()> {
-        self.check_arity(arg_count, function.arity())?;
+        self.check_arity(arg_count, closure.function().arity())?;
         let mut frame =
-            CallFrame::new(function, 0, self.stack.len() - arg_count - 1);
+            CallFrame::new(closure, 0, self.stack.len() - arg_count - 1);
         std::mem::swap(&mut self.frame, &mut frame);
         self.enclosing_frames.push(frame);
         Ok(())
@@ -192,8 +194,8 @@ impl Machine {
                 Instruction::Print => {
                     match self.pop() {
                         // debug
-                        Value::Function(fun) => {
-                            fun.disassemble();
+                        Value::Closure(c) => {
+                            c.function().disassemble();
                         }
                         v => println!("{}", v),
                     }
@@ -246,6 +248,11 @@ impl Machine {
                 Instruction::Not => {
                     let val = !self.pop().is_truthy();
                     self.push(Value::Boolean(val))
+                }
+
+                Instruction::Closure(fun) => {
+                    let closure = LoxClosure::new(fun.clone());
+                    self.push(Value::Closure(closure))
                 }
                 Instruction::LoadConstant(c) => self.push(c.clone()),
                 Instruction::Nil => self.push(Value::Nil),

@@ -582,7 +582,7 @@ impl<'a> Compiler<'a> {
         self.end_scope();
         let function = self.end_unit();
         self.emit_instr(
-            Instruction::LoadConstant(Value::Function(function)),
+            Instruction::Closure(function),
             name.position,
         )
     }

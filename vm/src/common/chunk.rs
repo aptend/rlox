@@ -1,6 +1,6 @@
 use std::fmt;
 
-use super::{LoxString, LoxFunction, Position, Value};
+use super::{LoxFunction, LoxString, Position, Value};
 
 // Instructions run in a virtual machine, 16 byets
 pub enum Instruction {
@@ -9,6 +9,8 @@ pub enum Instruction {
     Not,
 
     Closure(LoxFunction),
+    GetUpval(usize),
+    SetUpval(usize),
     DefGlobal(LoxString),
     GetGlobal(LoxString),
     SetGlobal(LoxString),
@@ -57,6 +59,12 @@ impl fmt::Display for Instruction {
             }
             Instruction::SetLocal(i) => {
                 write!(f, "{:20} {:?}", "OP_SetLocal", i)
+            }
+            Instruction::GetUpval(i) => {
+                write!(f, "{:20} {:?}", "OP_GetUpvalue", i)
+            }
+            Instruction::SetUpval(i) => {
+                write!(f, "{:20} {:?}", "OP_SetUpvalue", i)
             }
             Instruction::LoadConstant(c) => {
                 write!(f, "{:20} ", "OP_LoadConstant")?;

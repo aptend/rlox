@@ -1,10 +1,8 @@
 use super::Value;
 
-use std::time::{SystemTime, UNIX_EPOCH};
-use std::rc::Rc;
 use std::fmt;
-
-
+use std::rc::Rc;
+use std::time::{SystemTime, UNIX_EPOCH};
 
 std::thread_local! {
     pub static NATIVECLOCK: NativeFunction = NativeFunction(Rc::new(Native {
@@ -41,13 +39,11 @@ impl std::cmp::PartialEq for NativeFunction {
     }
 }
 
-
 impl fmt::Display for NativeFunction {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "<native fn {}>", self.0.name)
     }
 }
-
 
 pub fn clock(_args: &[Value]) -> Value {
     Value::Number(
@@ -57,4 +53,3 @@ pub fn clock(_args: &[Value]) -> Value {
             .as_secs_f64(),
     )
 }
-

@@ -1,8 +1,16 @@
 use super::LoxFunction;
 
-use std::rc::Rc;
 use std::fmt;
+use std::rc::Rc;
 
+#[derive(PartialEq, Eq)]
+pub struct Upvalue {
+    /// true if is captured from local variable,
+    /// otherwise, it is from another upvalue
+    pub is_local: bool,
+    /// its index in local variable list or upvalue list
+    pub index: usize,
+}
 
 pub struct Closure {
     function: LoxFunction,
@@ -13,9 +21,7 @@ pub struct LoxClosure(Rc<Closure>);
 
 impl LoxClosure {
     pub fn new(function: LoxFunction) -> Self {
-        LoxClosure(Rc::new(Closure {
-            function
-        }))
+        LoxClosure(Rc::new(Closure { function }))
     }
 
     #[inline(always)]

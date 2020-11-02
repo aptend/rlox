@@ -9,7 +9,7 @@ pub enum Value {
     Boolean(bool),
     String(LoxString),
     Closure(LoxClosure),
-    NativeFn(NativeFunction)
+    NativeFn(NativeFunction),
 }
 
 impl fmt::Display for Value {

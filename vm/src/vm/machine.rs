@@ -1,4 +1,6 @@
-use crate::common::{Arena, Instruction, LoxFunction, LoxClosure, Position, Value, NATIVECLOCK};
+use crate::common::{
+    Arena, Instruction, LoxClosure, LoxFunction, Position, Value, NATIVECLOCK,
+};
 
 use super::error::RuntimeError;
 
@@ -19,7 +21,7 @@ struct CallFrame {
 
 impl CallFrame {
     pub fn new(closure: LoxClosure, ip: usize, fp: usize) -> Self {
-        CallFrame { closure: closure, ip, fp }
+        CallFrame { closure, ip, fp }
     }
 
     #[inline(always)]
@@ -114,7 +116,7 @@ impl Machine {
         }
     }
 
-    fn check_arity(&self, arg_count: usize, arity:usize) -> VmResult<()> {
+    fn check_arity(&self, arg_count: usize, arity: usize) -> VmResult<()> {
         if arg_count != arity {
             self.runtime_err(args!(
                 "Expected {} arguments but got {}.",
@@ -126,11 +128,7 @@ impl Machine {
         }
     }
 
-    fn call(
-        &mut self,
-        closure: LoxClosure,
-        arg_count: usize,
-    ) -> VmResult<()> {
+    fn call(&mut self, closure: LoxClosure, arg_count: usize) -> VmResult<()> {
         self.check_arity(arg_count, closure.function().arity())?;
         let mut frame =
             CallFrame::new(closure, 0, self.stack.len() - arg_count - 1);
@@ -238,6 +236,8 @@ impl Machine {
                 Instruction::SetLocal(idx) => {
                     self.stack[*idx + self.frame.fp] = self.peek(0).clone();
                 }
+                Instruction::GetUpval(idx) => {}
+                Instruction::SetUpval(idx) => {}
                 Instruction::Negate => match self.pop() {
                     Value::Number(f) => self.push(Value::Number(-f)),
                     _ => {

@@ -1,5 +1,6 @@
 struct Local {
     name: String,
+    is_captured: bool,
     depth: Option<usize>,
 }
 
@@ -14,6 +15,7 @@ impl std::default::Default for Resolver {
             // Every function has a reserved local variable position for VM use
             locals: vec![Local {
                 name: "".to_string(),
+                is_captured: false,
                 depth: Some(0),
             }],
             cur_depth: 0,
@@ -63,6 +65,7 @@ impl Resolver {
         } else {
             self.locals.push(Local {
                 name: name.to_string(),
+                is_captured: false,
                 depth: None, // not intialized yet
             });
             true
@@ -78,6 +81,12 @@ impl Resolver {
             .rev()
             .position(|loc| loc.name == name)
             .map(|idx| self.locals.len() - 1 - idx)
+    }
+
+    pub fn mark_captured(&mut self, index: usize) {
+        if let Some(local) = self.locals.get_mut(index) {
+            local.is_captured = true;
+        }
     }
 
     pub fn mark_initialized(&mut self) {

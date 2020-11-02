@@ -1,7 +1,7 @@
 use super::error::SyntaxError;
 use crate::common::{
     Arena, Chunk, Instruction, LoxFunInner, LoxFunction, LoxString, Position,
-    Value,
+    Upvalue, Value,
 };
 use crate::scanner::*;
 
@@ -83,13 +83,19 @@ struct CompileUnit {
     chunk: Chunk,
     kind: FunctionKind,
     resolver: Resolver,
+    upvalues: Vec<Upvalue>,
 }
 
 impl CompileUnit {
     pub fn end_compile(mut self) -> LoxFunction {
         self.chunk.push_instr(Instruction::Nil, None);
         self.chunk.push_instr(Instruction::Return, None);
-        LoxFunction::new(LoxFunInner::new(self.arity, self.name, self.chunk))
+        LoxFunction::new(LoxFunInner::new(
+            self.arity,
+            self.upvalues.len(),
+            self.name,
+            self.chunk,
+        ))
     }
 
     // arity will be modified during parsing function declaration.
@@ -105,6 +111,20 @@ impl CompileUnit {
     pub fn kind(mut self, kind: FunctionKind) -> Self {
         self.kind = kind;
         self
+    }
+
+    pub fn add_upvalue(&mut self, index: usize, is_local: bool) -> usize {
+        if is_local {
+            self.resolver.mark_captured(index);
+        }
+        let upvalue = Upvalue { index, is_local };
+        match self.upvalues.iter().position(|v| *v == upvalue) {
+            Some(x) => x,
+            None => {
+                self.upvalues.push(upvalue);
+                self.upvalues.len() - 1
+            }
+        }
     }
 }
 
@@ -145,6 +165,56 @@ impl<'a> Compiler<'a> {
             mem::swap(&mut self.unit, &mut unit);
             unit.end_compile()
         }
+    }
+
+    fn resolve_upvalues(&mut self, name: &str) -> Option<usize> {
+        // transform the recursive version to iterative.
+        // a bit messy.
+
+        if self.enclosing_units.is_empty() {
+            return None;
+        }
+
+        if let Some(index) = self
+            .enclosing_units
+            .last()
+            .unwrap()
+            .resolver
+            .resolve_variale(name)
+        {
+            return Some(self.unit.add_upvalue(index, true));
+        }
+
+        let mut idx = self.enclosing_units.len() - 1;
+
+        // the index of higher upvalue
+        let mut index: Option<usize> = None;
+
+        unsafe {
+            while idx > 0 {
+                if let Some(x) = self
+                    .enclosing_units
+                    .get_unchecked(idx - 1)
+                    .resolver
+                    .resolve_variale(name)
+                {
+                    index = Some(
+                        self.enclosing_units
+                            .get_unchecked_mut(idx)
+                            .add_upvalue(x, true),
+                    );
+                }
+                idx -= 1;
+            }
+        }
+
+        if let Some(mut index) = index {
+            for unit in self.enclosing_units.iter_mut().skip(idx + 1) {
+                index = unit.add_upvalue(index, false);
+            }
+            return Some(index);
+        }
+        None
     }
 
     fn advance(&mut self) -> Option<Token> {
@@ -265,6 +335,15 @@ impl<'a> Compiler<'a> {
         let get_op;
         let set_op;
         if let Some(idx) = self.unit.resolver.resolve_variale(tk.as_str()) {
+            get_op = Instruction::GetLocal(idx);
+            set_op = Instruction::SetLocal(idx);
+        } else if let Some(idx) = self.resolve_upvalues(tk.as_str()) {
+            if idx >= 255 {
+                return Err(SyntaxError::new_compiler_err(
+                    Some(tk),
+                    "Too many closure variables in function.",
+                ));
+            }
             get_op = Instruction::GetLocal(idx);
             set_op = Instruction::SetLocal(idx);
         } else {
@@ -581,10 +660,7 @@ impl<'a> Compiler<'a> {
 
         self.end_scope();
         let function = self.end_unit();
-        self.emit_instr(
-            Instruction::Closure(function),
-            name.position,
-        )
+        self.emit_instr(Instruction::Closure(function), name.position)
     }
 
     fn func_decl(&mut self) -> CompileResult<()> {

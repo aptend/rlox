@@ -12,10 +12,10 @@ use std::fmt;
 
 pub use arena::Arena;
 pub use chunk::{Chunk, Instruction};
-pub use lox_closure::LoxClosure;
+pub use lox_closure::{LoxClosure, Upvalue};
 pub use lox_function::{LoxFunInner, LoxFunction};
 pub use lox_string::LoxString;
-pub use native_fn::{NATIVECLOCK, NativeFunction};
+pub use native_fn::{NativeFunction, NATIVECLOCK};
 pub use value::Value;
 
 #[derive(Clone, Debug, Copy, Eq, PartialEq, Default)]

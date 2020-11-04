@@ -6,6 +6,8 @@ use vm::compiler::Compiler;
 use vm::scanner::Scanner;
 use vm::Machine;
 
+use env_logger;
+
 fn run_prompt() {
     let mut lines = BufReader::new(io::stdin()).lines();
     let mut stdout = io::stdout();
@@ -43,7 +45,8 @@ fn run(source: &str) {
             return;
         }
     };
-    // main_func.disassemble();
+    main_bundle.function.disassemble();
+    std::process::exit(0);
     let mut vm = Machine::new(main_bundle, arena);
     if let Err(ref e) = vm.run() {
         println!("{}", e);
@@ -51,6 +54,8 @@ fn run(source: &str) {
 }
 
 fn main() {
+    env_logger::from_env(env_logger::Env::default().default_filter_or("debug"))
+        .init();
     match env::args().nth(1) {
         Some(file) => run_file(file),
         None => run_prompt(),

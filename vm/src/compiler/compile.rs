@@ -12,6 +12,8 @@ use lazy_static::lazy_static;
 
 use std::mem;
 
+use log::debug;
+
 type CompileResult<T> = Result<T, SyntaxError>;
 
 lazy_static! {
@@ -94,7 +96,7 @@ impl CompileUnit {
             function: LoxFunction::new(LoxFunInner::new(
                 self.arity, self.name, self.chunk,
             )),
-            upvalues: self.upvalues
+            upvalues: self.upvalues,
         }
     }
 
@@ -151,6 +153,7 @@ impl<'a> Compiler<'a> {
     }
 
     fn begin_unit(&mut self, name: &str, kind: FunctionKind) {
+        debug!("begin unit for {:?}", name);
         let mut unit = CompileUnit::default().name(name).kind(kind);
         mem::swap(&mut self.unit, &mut unit);
         self.enclosing_units.push(unit);
@@ -159,10 +162,12 @@ impl<'a> Compiler<'a> {
     fn end_unit(&mut self) -> ClosureCompileBundle {
         if self.enclosing_units.is_empty() {
             let unit = mem::take(&mut self.unit);
+            debug!("end unit for {:?}", unit.name);
             unit.end_compile()
         } else {
             let mut unit = self.enclosing_units.pop().unwrap();
             mem::swap(&mut self.unit, &mut unit);
+            debug!("end unit for {:?}", unit.name);
             unit.end_compile()
         }
     }
@@ -170,6 +175,7 @@ impl<'a> Compiler<'a> {
     fn resolve_upvalues(&mut self, name: &str) -> Option<usize> {
         // transform the recursive version to iterative.
         // a bit messy.
+        debug!("search for upvalue {:?} @ {:?}", name, self.unit.name);
 
         if self.enclosing_units.is_empty() {
             return None;
@@ -182,9 +188,17 @@ impl<'a> Compiler<'a> {
             .resolver
             .resolve_variale(name)
         {
+            debug!(
+                " find {:?} in {:?} at slot {} immediately",
+                name,
+                self.enclosing_units.last().unwrap().name,
+                index
+            );
             return Some(self.unit.add_upvalue(index, true));
         }
 
+        // reslove local variable at idx - 1 unit
+        // capture it into idx unit
         let mut idx = self.enclosing_units.len() - 1;
 
         // the index of higher upvalue
@@ -198,21 +212,32 @@ impl<'a> Compiler<'a> {
                     .resolver
                     .resolve_variale(name)
                 {
+                     debug!(
+                        " capture {:?} in {:?} at slot {} into {:?}",
+                        name,
+                        self.enclosing_units.get_unchecked(idx - 1).name,
+                        x,
+                        self.enclosing_units.get_unchecked(idx).name,
+                    );
                     index = Some(
                         self.enclosing_units
                             .get_unchecked_mut(idx)
                             .add_upvalue(x, true),
                     );
+                    break;
                 }
                 idx -= 1;
             }
         }
 
+        // capture something, forword it to the leaf unit
         if let Some(mut index) = index {
             for unit in self.enclosing_units.iter_mut().skip(idx + 1) {
+                debug!(" forward upvalue in {:?} -> upper slot {}", unit.name, index);
                 index = unit.add_upvalue(index, false);
             }
-            return Some(index);
+            debug!(" finally set upvalue in {:?} -> upper slot {}", self.unit.name, index);
+            return Some(self.unit.add_upvalue(index, false));
         }
         None
     }
@@ -344,8 +369,8 @@ impl<'a> Compiler<'a> {
                     "Too many closure variables in function.",
                 ));
             }
-            get_op = Instruction::GetLocal(idx);
-            set_op = Instruction::SetLocal(idx);
+            get_op = Instruction::GetUpval(idx);
+            set_op = Instruction::SetUpval(idx);
         } else {
             let ident = self.arena.alloc_string_ref(tk.as_str());
             get_op = Instruction::GetGlobal(ident.clone());
@@ -575,6 +600,7 @@ impl<'a> Compiler<'a> {
     ) -> CompileResult<Option<LoxString>> {
         if self.unit.resolver.is_local_ready() {
             if self.unit.resolver.declare_variable(tk.as_str()) {
+                debug!("declare a new local variable: {}", tk.as_str());
                 Ok(None)
             } else {
                 Err(SyntaxError::new_compiler_err(
@@ -660,6 +686,7 @@ impl<'a> Compiler<'a> {
 
         self.end_scope();
         let bundle = self.end_unit();
+        bundle.function.disassemble();
         self.emit_instr(Instruction::Closure(Box::new(bundle)), name.position)
     }
 

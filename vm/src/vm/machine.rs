@@ -1,6 +1,6 @@
 use crate::common::{
-    Arena, Instruction, LoxClosure, Position, Value, NATIVECLOCK,
-    ClosureCompileBundle,
+    Arena, ClosureCompileBundle, Instruction, LoxClosure, Position, Value,
+    NATIVECLOCK,
 };
 
 use super::error::RuntimeError;

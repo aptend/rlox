@@ -31,7 +31,7 @@ impl fmt::Display for ClosureCompileBundle {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{}", self.function)?;
         if !self.upvalues.is_empty() {
-            write!(f, "with")?;
+            write!(f, " with")?;
             for v in &self.upvalues {
                 write!(f, " {}", v)?;
             }

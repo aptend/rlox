@@ -1,5 +1,6 @@
 use crate::common::{
-    Arena, Instruction, LoxClosure, LoxFunction, Position, Value, NATIVECLOCK,
+    Arena, Instruction, LoxClosure, Position, Value, NATIVECLOCK,
+    ClosureCompileBundle,
 };
 
 use super::error::RuntimeError;
@@ -46,12 +47,12 @@ pub struct Machine {
 }
 
 impl Machine {
-    pub fn new(function: LoxFunction, mut arena: Arena) -> Self {
+    pub fn new(bundle: ClosureCompileBundle, mut arena: Arena) -> Self {
         let clock = NATIVECLOCK.with(|c| c.clone());
         let key = arena.alloc_string_ref(clock.name());
         arena.set_global(key, Value::NativeFn(clock));
 
-        let init_closure = LoxClosure::new(function);
+        let init_closure = LoxClosure::new(bundle.function);
         Machine {
             frame: CallFrame::new(init_closure.clone(), 0, 0),
             enclosing_frames: Vec::with_capacity(64),
@@ -250,8 +251,8 @@ impl Machine {
                     self.push(Value::Boolean(val))
                 }
 
-                Instruction::Closure(fun) => {
-                    let closure = LoxClosure::new(fun.clone());
+                Instruction::Closure(bundle) => {
+                    let closure = LoxClosure::new(bundle.function.clone());
                     self.push(Value::Closure(closure))
                 }
                 Instruction::LoadConstant(c) => self.push(c.clone()),

@@ -34,7 +34,7 @@ fn run_file(filename: String) {
 fn run(source: &str) {
     let scanner = Scanner::new(source);
     let mut compiler = Compiler::new(scanner);
-    let (main_func, arena) = match compiler.compile() {
+    let (main_bundle, arena) = match compiler.compile() {
         Ok(res) => res,
         Err(ref errs) => {
             for err in errs {
@@ -44,7 +44,7 @@ fn run(source: &str) {
         }
     };
     // main_func.disassemble();
-    let mut vm = Machine::new(main_func, arena);
+    let mut vm = Machine::new(main_bundle, arena);
     if let Err(ref e) = vm.run() {
         println!("{}", e);
     }

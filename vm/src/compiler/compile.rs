@@ -1,7 +1,7 @@
 use super::error::SyntaxError;
 use crate::common::{
-    Arena, Chunk, Instruction, LoxFunInner, LoxFunction, LoxString, Position,
-    Upvalue, Value,
+    Arena, Chunk, ClosureCompileBundle, Instruction, LoxFunInner, LoxFunction,
+    LoxString, Position, Upvalue, Value,
 };
 use crate::scanner::*;
 
@@ -87,15 +87,15 @@ struct CompileUnit {
 }
 
 impl CompileUnit {
-    pub fn end_compile(mut self) -> LoxFunction {
+    pub fn end_compile(mut self) -> ClosureCompileBundle {
         self.chunk.push_instr(Instruction::Nil, None);
         self.chunk.push_instr(Instruction::Return, None);
-        LoxFunction::new(LoxFunInner::new(
-            self.arity,
-            self.upvalues.len(),
-            self.name,
-            self.chunk,
-        ))
+        ClosureCompileBundle {
+            function: LoxFunction::new(LoxFunInner::new(
+                self.arity, self.name, self.chunk,
+            )),
+            upvalues: self.upvalues
+        }
     }
 
     // arity will be modified during parsing function declaration.
@@ -156,7 +156,7 @@ impl<'a> Compiler<'a> {
         self.enclosing_units.push(unit);
     }
 
-    fn end_unit(&mut self) -> LoxFunction {
+    fn end_unit(&mut self) -> ClosureCompileBundle {
         if self.enclosing_units.is_empty() {
             let unit = mem::take(&mut self.unit);
             unit.end_compile()
@@ -659,8 +659,8 @@ impl<'a> Compiler<'a> {
         self.block_stmt()?;
 
         self.end_scope();
-        let function = self.end_unit();
-        self.emit_instr(Instruction::Closure(function), name.position)
+        let bundle = self.end_unit();
+        self.emit_instr(Instruction::Closure(Box::new(bundle)), name.position)
     }
 
     fn func_decl(&mut self) -> CompileResult<()> {
@@ -860,7 +860,7 @@ impl<'a> Compiler<'a> {
 
     pub fn compile(
         &mut self,
-    ) -> Result<(LoxFunction, Arena), Vec<SyntaxError>> {
+    ) -> Result<(ClosureCompileBundle, Arena), Vec<SyntaxError>> {
         while self.peek().is_some() {
             if let Err(e) = self.declaration() {
                 self.errors.push(e);

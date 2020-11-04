@@ -1,6 +1,6 @@
 use std::fmt;
 
-use super::{LoxFunction, LoxString, Position, Value};
+use super::{ClosureCompileBundle, LoxString, Position, Value};
 
 // Instructions run in a virtual machine, 16 byets
 pub enum Instruction {
@@ -8,7 +8,10 @@ pub enum Instruction {
     Negate,
     Not,
 
-    Closure(LoxFunction),
+    // we have to packet up LoxFunction and Upvalues generated at compile-time
+    // because we no constants list. They are the raw materials for building
+    // a closure at runtime.
+    Closure(Box<ClosureCompileBundle>),
     GetUpval(usize),
     SetUpval(usize),
     DefGlobal(LoxString),

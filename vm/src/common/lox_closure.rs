@@ -12,6 +12,34 @@ pub struct Upvalue {
     pub index: usize,
 }
 
+impl fmt::Display for Upvalue {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        if self.is_local {
+            write!(f, "local@{}", self.index)
+        } else {
+            write!(f, "upvalue@{}", self.index)
+        }
+    }
+}
+
+pub struct ClosureCompileBundle {
+    pub function: LoxFunction,
+    pub upvalues: Vec<Upvalue>,
+}
+
+impl fmt::Display for ClosureCompileBundle {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.function)?;
+        if !self.upvalues.is_empty() {
+            write!(f, "with")?;
+            for v in &self.upvalues {
+                write!(f, " {}", v)?;
+            }
+        }
+        Ok(())
+    }
+}
+
 pub struct Closure {
     function: LoxFunction,
 }

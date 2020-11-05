@@ -81,7 +81,7 @@ impl std::default::Default for FunctionKind {
 #[derive(Default)]
 struct CompileUnit {
     arity: usize,
-    name: Option<String>,
+    name: String,
     chunk: Chunk,
     kind: FunctionKind,
     resolver: Resolver,
@@ -106,7 +106,7 @@ impl CompileUnit {
     }
 
     pub fn name(mut self, name: &str) -> Self {
-        self.name = Some(name.to_string());
+        self.name = name.to_string();
         self
     }
 
@@ -142,13 +142,15 @@ pub struct Compiler<'a> {
 
 impl<'a> Compiler<'a> {
     pub fn new(scanner: Scanner<'a>) -> Compiler<'a> {
+        let mut unit = CompileUnit::default();
+        unit.name.push_str("__main__");
         Compiler {
             errors: Vec::new(),
             peeked: None,
             tokens: scanner,
             arena: Arena::default(),
-            unit: CompileUnit::default(),
             enclosing_units: vec![],
+            unit,
         }
     }
 
@@ -212,7 +214,7 @@ impl<'a> Compiler<'a> {
                     .resolver
                     .resolve_variale(name)
                 {
-                     debug!(
+                    debug!(
                         " capture {:?} in {:?} at slot {} into {:?}",
                         name,
                         self.enclosing_units.get_unchecked(idx - 1).name,
@@ -600,7 +602,6 @@ impl<'a> Compiler<'a> {
     ) -> CompileResult<Option<LoxString>> {
         if self.unit.resolver.is_local_ready() {
             if self.unit.resolver.declare_variable(tk.as_str()) {
-                debug!("declare a new local variable: {}", tk.as_str());
                 Ok(None)
             } else {
                 Err(SyntaxError::new_compiler_err(
@@ -686,7 +687,7 @@ impl<'a> Compiler<'a> {
 
         self.end_scope();
         let bundle = self.end_unit();
-        bundle.function.disassemble();
+        // bundle.function.disassemble();
         self.emit_instr(Instruction::Closure(Box::new(bundle)), name.position)
     }
 

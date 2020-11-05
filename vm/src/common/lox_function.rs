@@ -6,13 +6,12 @@ use std::rc::Rc;
 #[derive(Default)]
 pub struct LoxFunInner {
     arity: usize,
-    // FIXME: why not give the top-level function a name, like '__main__'?
-    name: Option<String>,
+    name: String,
     chunk: Chunk,
 }
 
 impl LoxFunInner {
-    pub fn new(arity: usize, name: Option<String>, chunk: Chunk) -> Self {
+    pub fn new(arity: usize, name: String, chunk: Chunk) -> Self {
         LoxFunInner { arity, name, chunk }
     }
 }
@@ -50,9 +49,6 @@ impl std::cmp::PartialEq for LoxFunction {
 
 impl fmt::Display for LoxFunction {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match &self.0.name {
-            Some(s) => write!(f, "<fn {}>", s),
-            None => write!(f, "__main__"),
-        }
+        self.0.name.fmt(f)
     }
 }

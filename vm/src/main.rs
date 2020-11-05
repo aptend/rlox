@@ -45,8 +45,8 @@ fn run(source: &str) {
             return;
         }
     };
-    main_bundle.function.disassemble();
-    std::process::exit(0);
+    // main_bundle.function.disassemble();
+    // std::process::exit(0);
     let mut vm = Machine::new(main_bundle, arena);
     if let Err(ref e) = vm.run() {
         println!("{}", e);

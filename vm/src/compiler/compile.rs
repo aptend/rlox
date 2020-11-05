@@ -235,10 +235,16 @@ impl<'a> Compiler<'a> {
         // capture something, forword it to the leaf unit
         if let Some(mut index) = index {
             for unit in self.enclosing_units.iter_mut().skip(idx + 1) {
-                debug!(" forward upvalue in {:?} -> upper slot {}", unit.name, index);
+                debug!(
+                    " forward upvalue in {:?} -> upper slot {}",
+                    unit.name, index
+                );
                 index = unit.add_upvalue(index, false);
             }
-            debug!(" finally set upvalue in {:?} -> upper slot {}", self.unit.name, index);
+            debug!(
+                " finally set upvalue in {:?} -> upper slot {}",
+                self.unit.name, index
+            );
             return Some(self.unit.add_upvalue(index, false));
         }
         None

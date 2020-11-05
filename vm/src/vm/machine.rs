@@ -1,12 +1,13 @@
 use crate::common::{
-    Arena, ClosureCompileBundle, Instruction, LoxClosure, Position, Value,
-    NATIVECLOCK,
+    Arena, ClosureCompileBundle, Instruction, LoxClosure, Position,
+    UpvalueCell, Value, NATIVECLOCK,
 };
 
 use super::error::RuntimeError;
 
 use std::fmt::{format, Arguments};
 use std::format_args as args;
+use std::rc::Rc;
 
 type VmResult<T> = Result<T, RuntimeError>;
 
@@ -52,7 +53,7 @@ impl Machine {
         let key = arena.alloc_string_ref(clock.name());
         arena.set_global(key, Value::NativeFn(clock));
 
-        let init_closure = LoxClosure::new(bundle.function);
+        let init_closure = LoxClosure::new(bundle.function, Vec::new());
         Machine {
             frame: CallFrame::new(init_closure.clone(), 0, 0),
             enclosing_frames: Vec::with_capacity(64),
@@ -136,6 +137,12 @@ impl Machine {
         std::mem::swap(&mut self.frame, &mut frame);
         self.enclosing_frames.push(frame);
         Ok(())
+    }
+
+    // capture the Value on stack
+    fn open_upvalue(&mut self, stack_idx: usize) -> Rc<UpvalueCell> {
+        // dedup
+        Rc::new(UpvalueCell::Open(stack_idx))
     }
 
     pub fn run(&mut self) -> VmResult<()> {
@@ -237,8 +244,28 @@ impl Machine {
                 Instruction::SetLocal(idx) => {
                     self.stack[*idx + self.frame.fp] = self.peek(0).clone();
                 }
-                Instruction::GetUpval(idx) => {}
-                Instruction::SetUpval(idx) => {}
+                Instruction::GetUpval(idx) => {
+                    match &*self.frame.closure.upvalues()[*idx] {
+                        UpvalueCell::Open(idx) => {
+                            let value = self.stack[*idx].clone();
+                            self.push(value);
+                        }
+                        UpvalueCell::Closed(cell) => {
+                            let value = cell.borrow().clone();
+                            self.push(value);
+                        }
+                    }
+                }
+                Instruction::SetUpval(idx) => {
+                    match &*self.frame.closure.upvalues()[*idx] {
+                        UpvalueCell::Open(idx) => {
+                            self.stack[*idx] = self.peek(0).clone();
+                        }
+                        UpvalueCell::Closed(cell) => {
+                            *cell.borrow_mut() = self.peek(0).clone();
+                        }
+                    }
+                }
                 Instruction::Negate => match self.pop() {
                     Value::Number(f) => self.push(Value::Number(-f)),
                     _ => {
@@ -252,7 +279,21 @@ impl Machine {
                 }
 
                 Instruction::Closure(bundle) => {
-                    let closure = LoxClosure::new(bundle.function.clone());
+                    let mut upvalues =
+                        Vec::with_capacity(bundle.upvalues.len());
+                    for info in &bundle.upvalues {
+                        let index = info.index;
+                        if info.is_local {
+                            let stack_idx = index + self.frame.fp;
+                            upvalues.push(self.open_upvalue(stack_idx));
+                        } else {
+                            upvalues.push(
+                                self.frame.closure.upvalues()[index].clone(),
+                            );
+                        }
+                    }
+                    let closure =
+                        LoxClosure::new(bundle.function.clone(), upvalues);
                     self.push(Value::Closure(closure))
                 }
                 Instruction::LoadConstant(c) => self.push(c.clone()),

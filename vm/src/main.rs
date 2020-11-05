@@ -6,8 +6,6 @@ use vm::compiler::Compiler;
 use vm::scanner::Scanner;
 use vm::Machine;
 
-use env_logger;
-
 fn run_prompt() {
     let mut lines = BufReader::new(io::stdin()).lines();
     let mut stdout = io::stdout();

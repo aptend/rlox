@@ -42,17 +42,47 @@ impl fmt::Display for ClosureCompileBundle {
     }
 }
 
+
+// This is my first failed try. Helpful for understanding how ObjUpvalue works
+// #[derive(Clone)]
+// enum UpvalueCellAnother {
+//     Open(usize),
+//     Closed(Rc<RefCell<Value>>)
+// }
+
 /// UpvalueCell serves on runtime stage.
 /// It has two states: open and closed, pointing to a stack Value and heap Value respectively
 // TODO: Everytime we access UpvalueCell, we have to branch on it is state,
 // this will slow down the program. Do the same thing in clox using unsafe.
-pub enum UpvalueCell {
+#[derive(Clone)]
+pub struct UpvalueCell(Rc<RefCell<CellState>>);
+
+impl UpvalueCell {
+    pub fn new_open_with_index(index: usize) -> Self {
+        let inner = Rc::new(RefCell::new(CellState::Open(index)));
+        UpvalueCell(inner)
+    }
+
+    pub fn close_with_value(&self, value: Value) {
+        self.0.replace(CellState::Closed(value));
+    }
+}
+
+impl std::ops::Deref for UpvalueCell {
+    type Target = RefCell<CellState>;
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+
+pub enum CellState {
     Open(usize),
-    Closed(RefCell<Value>),
+    Closed(Value),
 }
 pub struct Closure {
     function: LoxFunction,
-    upvalues: Vec<Rc<UpvalueCell>>,
+    upvalues: Vec<UpvalueCell>,
 }
 
 /// LoxFuntion equipped with UpvalueCells turns into LoxClosure in runtime.
@@ -60,7 +90,7 @@ pub struct Closure {
 pub struct LoxClosure(Rc<Closure>);
 
 impl LoxClosure {
-    pub fn new(function: LoxFunction, upvalues: Vec<Rc<UpvalueCell>>) -> Self {
+    pub fn new(function: LoxFunction, upvalues: Vec<UpvalueCell>) -> Self {
         LoxClosure(Rc::new(Closure { function, upvalues }))
     }
 
@@ -70,7 +100,7 @@ impl LoxClosure {
     }
 
     #[inline(always)]
-    pub fn upvalues(&self) -> &[Rc<UpvalueCell>] {
+    pub fn upvalues(&self) -> &[UpvalueCell] {
         &self.0.upvalues
     }
 }

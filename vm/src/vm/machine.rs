@@ -1,13 +1,12 @@
 use crate::common::{
     Arena, ClosureCompileBundle, Instruction, LoxClosure, Position,
-    UpvalueCell, Value, NATIVECLOCK,
+    UpvalueCell, CellState, Value, NATIVECLOCK,
 };
 
 use super::error::RuntimeError;
 
 use std::fmt::{format, Arguments};
 use std::format_args as args;
-use std::rc::Rc;
 
 type VmResult<T> = Result<T, RuntimeError>;
 
@@ -140,9 +139,9 @@ impl Machine {
     }
 
     // capture the Value on stack
-    fn open_upvalue(&mut self, stack_idx: usize) -> Rc<UpvalueCell> {
+    fn open_upvalue(&mut self, stack_idx: usize) -> UpvalueCell {
         // dedup
-        Rc::new(UpvalueCell::Open(stack_idx))
+        UpvalueCell::new_open_with_index(stack_idx)
     }
 
     pub fn run(&mut self) -> VmResult<()> {
@@ -245,24 +244,34 @@ impl Machine {
                     self.stack[*idx + self.frame.fp] = self.peek(0).clone();
                 }
                 Instruction::GetUpval(idx) => {
-                    match &*self.frame.closure.upvalues()[*idx] {
-                        UpvalueCell::Open(idx) => {
+                    // first way, unsafe. it is acceptable because 
+                    // pushing to stack won't affect UpvalueCell at all
+                    let cell = &self.frame.closure.upvalues()[*idx] as *const UpvalueCell;
+                    // deref to RefCell<CellState> 
+                    // borrow out Ref<'_>
+                    // deref to CellState
+                    // borrow a reference
+                    let state = unsafe { &*(*cell).borrow() };
+                    match state {
+                        CellState::Open(idx) => {
                             let value = self.stack[*idx].clone();
                             self.push(value);
                         }
-                        UpvalueCell::Closed(cell) => {
-                            let value = cell.borrow().clone();
-                            self.push(value);
+                        CellState::Closed(value) => {
+                            self.push(value.clone());
                         }
                     }
                 }
                 Instruction::SetUpval(idx) => {
-                    match &*self.frame.closure.upvalues()[*idx] {
-                        UpvalueCell::Open(idx) => {
+                    // second way, clone
+                    let cell = self.frame.closure.upvalues()[*idx].clone();
+                    let state = &mut *cell.borrow_mut();
+                    match state {
+                        CellState::Open(idx) => {
                             self.stack[*idx] = self.peek(0).clone();
                         }
-                        UpvalueCell::Closed(cell) => {
-                            *cell.borrow_mut() = self.peek(0).clone();
+                        CellState::Closed(value) => {
+                            *value = self.peek(0).clone();
                         }
                     }
                 }

@@ -12,7 +12,7 @@ use std::fmt;
 
 pub use arena::Arena;
 pub use chunk::{Chunk, Instruction};
-pub use lox_closure::{ClosureCompileBundle, LoxClosure, Upvalue, UpvalueCell};
+pub use lox_closure::{ClosureCompileBundle, LoxClosure, Upvalue, UpvalueCell, CellState};
 pub use lox_function::{LoxFunInner, LoxFunction};
 pub use lox_string::LoxString;
 pub use native_fn::{NativeFunction, NATIVECLOCK};

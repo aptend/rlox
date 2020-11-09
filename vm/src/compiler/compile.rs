@@ -116,9 +116,9 @@ impl CompileUnit {
     }
 
     pub fn add_upvalue(&mut self, index: usize, is_local: bool) -> usize {
-        if is_local {
-            self.resolver.mark_captured(index);
-        }
+        // if is_local {
+            // self.resolver.mark_captured(index);
+        // }
         let upvalue = Upvalue { index, is_local };
         match self.upvalues.iter().position(|v| *v == upvalue) {
             Some(x) => x,

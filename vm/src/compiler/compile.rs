@@ -303,7 +303,11 @@ impl<'a> Compiler<'a> {
     }
 
     fn end_scope(&mut self) {
-        for _ in 0..self.unit.resolver.end_scope() {
+        let n = self.unit.resolver.end_scope();
+        self.unit
+            .chunk
+            .push_instr(Instruction::CloseUpvalue(n), None);
+        for _ in 0..n {
             self.emit_pop();
         }
     }

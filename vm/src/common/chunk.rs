@@ -12,6 +12,8 @@ pub enum Instruction {
     // because we no constants list. They are the raw materials for building
     // a closure at runtime.
     Closure(Box<ClosureCompileBundle>),
+    // close N variables near the stack top
+    CloseUpvalue(usize),
     GetUpval(usize),
     SetUpval(usize),
     DefGlobal(LoxString),
@@ -47,6 +49,9 @@ impl fmt::Display for Instruction {
         match self {
             Instruction::Closure(fun) => {
                 write!(f, "{:20} {}", "OP_Closure", fun)
+            }
+            Instruction::CloseUpvalue(n) => {
+                write!(f, "{:20} {}", "OP_CloseUpvalue", n)
             }
             Instruction::DefGlobal(s) => {
                 write!(f, "{:20} {:?}", "OP_DefineGlobal", s)

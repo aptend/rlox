@@ -1,6 +1,6 @@
 use crate::common::{
-    Arena, ClosureCompileBundle, Instruction, LoxClosure, Position,
-    UpvalueCell, CellState, Value, NATIVECLOCK,
+    Arena, CellState, ClosureCompileBundle, Instruction, LoxClosure, Position,
+    UpvalueCell, Value, NATIVECLOCK,
 };
 
 use super::error::RuntimeError;
@@ -42,6 +42,7 @@ pub struct Machine {
     // FIXME: will it be faster to allocate CallFrame on stack?
     enclosing_frames: Vec<CallFrame>,
 
+    open_cells: Vec<UpvalueCell>,
     arena: Arena,
     stack: Vec<Value>,
 }
@@ -56,6 +57,7 @@ impl Machine {
         Machine {
             frame: CallFrame::new(init_closure.clone(), 0, 0),
             enclosing_frames: Vec::with_capacity(64),
+            open_cells: Vec::new(),
             arena,
             stack: vec![Value::Closure(init_closure)],
         }
@@ -138,10 +140,32 @@ impl Machine {
         Ok(())
     }
 
-    // capture the Value on stack
+    // capture the Value on stack.
     fn open_upvalue(&mut self, stack_idx: usize) -> UpvalueCell {
-        // dedup
-        UpvalueCell::new_open_with_index(stack_idx)
+        match self
+            .open_cells
+            .iter()
+            .rev()
+            .find(|cell| cell.check_open(|idx| idx == stack_idx).is_some())
+        {
+            Some(cell) => cell.clone(),
+            None => {
+                let cell = UpvalueCell::new_open_with_index(stack_idx);
+                self.open_cells.push(cell.clone());
+                cell
+            }
+        }
+    }
+
+    fn close_upvalue(&mut self, from_idx: usize) {
+        for cell in self.open_cells.iter_mut() {
+            if let Some(idx) = cell.check_open(|idx| idx >= from_idx) {
+                let value = self.stack[idx].clone();
+                cell.close_with_value(value);
+            }
+        }
+
+        self.open_cells.retain(UpvalueCell::is_open);
     }
 
     pub fn run(&mut self) -> VmResult<()> {
@@ -158,8 +182,8 @@ impl Machine {
         loop {
             let instr = self.read_instr();
             // for debug
-            // println!("{}", instr);
             // self._debug_stack();
+            // println!("{}", unsafe { &*instr });
 
             // Use unsafe to circumvent borrow checker, as we can tell that
             // the muttable parts (frame.ip, starck etc.) will not affect
@@ -175,12 +199,16 @@ impl Machine {
                         return Ok(());
                     } else {
                         // drop local variables of callee function
+                        self.close_upvalue(self.frame.fp);
                         self.stack.drain(self.frame.fp..);
                         self.push(result);
 
                         let mut frame = self.enclosing_frames.pop().unwrap();
                         std::mem::swap(&mut self.frame, &mut frame);
                     }
+                }
+                Instruction::CloseUpvalue(n) => {
+                    self.close_upvalue(self.stack.len() - n)
                 }
                 Instruction::Pop => {
                     self.pop();
@@ -244,10 +272,11 @@ impl Machine {
                     self.stack[*idx + self.frame.fp] = self.peek(0).clone();
                 }
                 Instruction::GetUpval(idx) => {
-                    // first way, unsafe. it is acceptable because 
+                    // first way, unsafe. it is acceptable because
                     // pushing to stack won't affect UpvalueCell at all
-                    let cell = &self.frame.closure.upvalues()[*idx] as *const UpvalueCell;
-                    // deref to RefCell<CellState> 
+                    let cell = &self.frame.closure.upvalues()[*idx]
+                        as *const UpvalueCell;
+                    // deref to RefCell<CellState>
                     // borrow out Ref<'_>
                     // deref to CellState
                     // borrow a reference
@@ -294,6 +323,7 @@ impl Machine {
                         let index = info.index;
                         if info.is_local {
                             let stack_idx = index + self.frame.fp;
+                            // println!("{:?}", self.open_cells);
                             upvalues.push(self.open_upvalue(stack_idx));
                         } else {
                             upvalues.push(

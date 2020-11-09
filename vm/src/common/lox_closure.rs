@@ -42,7 +42,6 @@ impl fmt::Display for ClosureCompileBundle {
     }
 }
 
-
 // This is my first failed try. Helpful for understanding how ObjUpvalue works
 // #[derive(Clone)]
 // enum UpvalueCellAnother {
@@ -66,6 +65,20 @@ impl UpvalueCell {
     pub fn close_with_value(&self, value: Value) {
         self.0.replace(CellState::Closed(value));
     }
+
+    pub fn check_open<F: Fn(usize) -> bool>(&self, f: F) -> Option<usize> {
+        match &*self.0.borrow() {
+            CellState::Open(idx) if f(*idx) => Some(*idx),
+            _ => None,
+        }
+    }
+
+    pub fn is_open(&self) -> bool {
+        match &*self.0.borrow() {
+            CellState::Open(_) => true,
+            _ => false,
+        }
+    }
 }
 
 impl std::ops::Deref for UpvalueCell {
@@ -75,6 +88,14 @@ impl std::ops::Deref for UpvalueCell {
     }
 }
 
+impl fmt::Debug for UpvalueCell {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match &*self.0.borrow() {
+            CellState::Open(x) => write!(f, "open({})", x),
+            _ => write!(f, "closed"),
+        }
+    }
+}
 
 pub enum CellState {
     Open(usize),

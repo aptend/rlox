@@ -144,28 +144,28 @@ impl Machine {
     fn open_upvalue(&mut self, stack_idx: usize) -> UpvalueCell {
         match self
             .open_cells
-            .iter()
-            .rev()
-            .find(|cell| cell.check_open(|idx| idx == stack_idx).is_some())
+            .as_slice()
+            .binary_search_by_key(&stack_idx, UpvalueCell::index)
         {
-            Some(cell) => cell.clone(),
-            None => {
+            Ok(idx) => self.open_cells[idx].clone(),
+            Err(idx) => {
                 let cell = UpvalueCell::new_open_with_index(stack_idx);
-                self.open_cells.push(cell.clone());
+                self.open_cells.insert(idx, cell.clone());
                 cell
             }
         }
     }
 
     fn close_upvalue(&mut self, from_idx: usize) {
-        for cell in self.open_cells.iter_mut() {
-            if let Some(idx) = cell.check_open(|idx| idx >= from_idx) {
-                let value = self.stack[idx].clone();
-                cell.close_with_value(value);
+        while let Some(cell) = self.open_cells.last() {
+            let idx = cell.index();
+            if idx < from_idx {
+                break;
             }
+            let value = self.stack[idx].clone();
+            cell.close_with_value(value);
+            self.open_cells.pop();
         }
-
-        self.open_cells.retain(UpvalueCell::is_open);
     }
 
     pub fn run(&mut self) -> VmResult<()> {
@@ -186,7 +186,7 @@ impl Machine {
             // println!("{}", unsafe { &*instr });
 
             // Use unsafe to circumvent borrow checker, as we can tell that
-            // the muttable parts (frame.ip, starck etc.) will not affect
+            // the muttable parts (frame.ip, stack etc.) will not affect
             // the memory of Instruction.
             // TODO: Of course, we could design a struct RunningCallFrame<'a> to
             // eliminate the unsafe code

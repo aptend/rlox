@@ -66,17 +66,10 @@ impl UpvalueCell {
         self.0.replace(CellState::Closed(value));
     }
 
-    pub fn check_open<F: Fn(usize) -> bool>(&self, f: F) -> Option<usize> {
+    pub fn index(&self) -> usize {
         match &*self.0.borrow() {
-            CellState::Open(idx) if f(*idx) => Some(*idx),
-            _ => None,
-        }
-    }
-
-    pub fn is_open(&self) -> bool {
-        match &*self.0.borrow() {
-            CellState::Open(_) => true,
-            _ => false,
+            CellState::Open(idx) => *idx,
+            _ => panic!("upvalue cell panic"),
         }
     }
 }

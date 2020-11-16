@@ -4,4 +4,8 @@ Awesome book: [Crafting Interpreters](https://craftinginterpreters.com/contents.
 
 Finish tree-walk interpreter.
 
-Working on VM version.
+Working on VM.
+
+  I need more knowledge of the unsafe Rust to implement GC.
+
+  Learning Rustonomicon

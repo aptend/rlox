@@ -1,6 +1,6 @@
 #![feature(ptr_internals)]
 #![feature(allocator_api)]
-
+#![allow(dead_code)]
 // working on nightly 1.50
 
 use std::alloc::{handle_alloc_error, AllocRef, Global, Layout};
@@ -8,15 +8,8 @@ use std::mem;
 use std::ops::{Deref, DerefMut};
 use std::ptr::{self, Unique};
 
-struct MyVec<T> {
-    ptr: Unique<T>,
-    len: usize,
-    cap: usize,
-}
-
 struct IntoIter<T> {
-    ptr: Unique<T>,
-    layout: Layout,
+    buf: RawVec<T>,
     startp: *const T,
     endp: *const T,
 }
@@ -63,7 +56,6 @@ impl<T> Drop for IntoIter<T> {
                 (self.startp as *mut T).drop_in_place();
                 self.startp = self.startp.add(1);
             }
-            Global.dealloc(self.ptr.cast().into(), self.layout);
         }
     }
 }
@@ -73,15 +65,14 @@ impl<T> IntoIterator for MyVec<T> {
     type IntoIter = IntoIter<T>;
     fn into_iter(self) -> Self::IntoIter {
         unsafe {
-            let ptr = self.ptr;
-            let layout = self.current_layout();
-            let startp = self.ptr.as_ptr();
+            // RawVec !: Copy, so we get buf without destructure it.
+            let buf = ptr::read(&self.buf);
+            let startp = self.ptr();
             let endp = startp.add(self.len);
             // IntoIter is responsible for dropping now.
             mem::forget(self);
             IntoIter {
-                ptr,
-                layout,
+                buf,
                 startp,
                 endp,
             }
@@ -89,13 +80,17 @@ impl<T> IntoIterator for MyVec<T> {
     }
 }
 
-impl<T> MyVec<T> {
+struct RawVec<T> {
+    ptr: Unique<T>,
+    cap: usize,
+}
+
+impl<T> RawVec<T> {
     pub fn new() -> Self {
         assert!(mem::size_of::<T>() != 0, "We're not ready to handle ZSTs");
-        MyVec {
+        RawVec {
             ptr: Unique::dangling(),
             cap: 0,
-            len: 0,
         }
     }
 
@@ -103,62 +98,6 @@ impl<T> MyVec<T> {
         let align = mem::align_of::<T>();
         let size = mem::size_of::<T>();
         unsafe { Layout::from_size_align_unchecked(size * self.cap, align) }
-    }
-
-    pub fn insert(&mut self, index: usize, elem: T) {
-        assert!(index <= self.len, "index out of bounds");
-        if self.cap == self.len {
-            self.grow();
-        }
-
-        unsafe {
-            if index < self.len {
-                ptr::copy(
-                    self.ptr.as_ptr().offset(index as isize),
-                    self.ptr.as_ptr().offset(1 + index as isize),
-                    self.len - index,
-                );
-            }
-            ptr::write(self.ptr.as_ptr().offset(index as isize), elem);
-            self.len += 1;
-        }
-    }
-
-    pub fn remove(&mut self, index: usize) -> T {
-        assert!(index <= self.len, "index out of bounds");
-        unsafe {
-            self.len -= 1;
-            let result = ptr::read(self.ptr.as_ptr().offset(index as isize));
-            ptr::copy(
-                self.ptr.as_ptr().offset(1 + index as isize),
-                self.ptr.as_ptr().offset(index as isize),
-                self.len - index,
-            );
-            result
-        }
-    }
-
-    pub fn push(&mut self, elem: T) {
-        if self.len == self.cap {
-            self.grow();
-        }
-
-        unsafe {
-            ptr::write(self.ptr.as_ptr().offset(self.len as isize), elem);
-        }
-
-        self.len += 1;
-    }
-
-    pub fn pop(&mut self) -> Option<T> {
-        if self.len == 0 {
-            None
-        } else {
-            self.len -= 1;
-            unsafe {
-                Some(ptr::read(self.ptr.as_ptr().offset(self.len as isize)))
-            }
-        }
     }
 
     pub fn grow(&mut self) {
@@ -192,17 +131,101 @@ impl<T> MyVec<T> {
     }
 }
 
-impl<T> Drop for MyVec<T> {
+impl<T> Drop for RawVec<T> {
     fn drop(&mut self) {
         if self.cap != 0 {
-            let len = self.len as isize;
-            self.len = 0;
             unsafe {
-                for i in 0..len {
-                    ptr::drop_in_place(self.ptr.as_ptr().offset(i));
-                }
                 let layout = self.current_layout();
                 Global.dealloc(self.ptr.cast().into(), layout);
+            }
+        }
+    }
+}
+
+struct MyVec<T> {
+    buf: RawVec<T>,
+    len: usize,
+}
+
+impl<T> MyVec<T> {
+    pub fn new() -> Self {
+        assert!(mem::size_of::<T>() != 0, "We're not ready to handle ZSTs");
+        MyVec {
+            buf: RawVec::new(),
+            len: 0,
+        }
+    }
+
+    fn ptr(&self) -> *mut T {
+        self.buf.ptr.as_ptr()
+    }
+
+    fn cap(&self) -> usize {
+        self.buf.cap
+    }
+
+    pub fn insert(&mut self, index: usize, elem: T) {
+        assert!(index <= self.len, "index out of bounds");
+        if self.cap() == self.len {
+            self.buf.grow();
+        }
+
+        unsafe {
+            if index < self.len {
+                ptr::copy(
+                    self.ptr().offset(index as isize),
+                    self.ptr().offset(1 + index as isize),
+                    self.len - index,
+                );
+            }
+            ptr::write(self.ptr().offset(index as isize), elem);
+            self.len += 1;
+        }
+    }
+
+    pub fn remove(&mut self, index: usize) -> T {
+        assert!(index <= self.len, "index out of bounds");
+        unsafe {
+            self.len -= 1;
+            let result = ptr::read(self.ptr().offset(index as isize));
+            ptr::copy(
+                self.ptr().offset(1 + index as isize),
+                self.ptr().offset(index as isize),
+                self.len - index,
+            );
+            result
+        }
+    }
+
+    pub fn push(&mut self, elem: T) {
+        if self.cap() == self.len {
+            self.buf.grow();
+        }
+
+        unsafe {
+            ptr::write(self.ptr().offset(self.len as isize), elem);
+        }
+
+        self.len += 1;
+    }
+
+    pub fn pop(&mut self) -> Option<T> {
+        if self.len == 0 {
+            None
+        } else {
+            self.len -= 1;
+            unsafe { Some(ptr::read(self.ptr().offset(self.len as isize))) }
+        }
+    }
+}
+
+impl<T> Drop for MyVec<T> {
+    fn drop(&mut self) {
+        let len = self.len as isize;
+        self.len = 0;
+        unsafe {
+            for i in 0..len {
+                ptr::drop_in_place(self.ptr().offset(i));
             }
         }
     }
@@ -211,13 +234,13 @@ impl<T> Drop for MyVec<T> {
 impl<T> Deref for MyVec<T> {
     type Target = [T];
     fn deref(&self) -> &Self::Target {
-        unsafe { std::slice::from_raw_parts(self.ptr.as_ptr(), self.len) }
+        unsafe { std::slice::from_raw_parts(self.ptr(), self.len) }
     }
 }
 
 impl<T> DerefMut for MyVec<T> {
     fn deref_mut(&mut self) -> &mut Self::Target {
-        unsafe { std::slice::from_raw_parts_mut(self.ptr.as_ptr(), self.len) }
+        unsafe { std::slice::from_raw_parts_mut(self.ptr(), self.len) }
     }
 }
 

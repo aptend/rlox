@@ -4,17 +4,35 @@
 // working on nightly 1.50
 
 use std::alloc::{handle_alloc_error, AllocRef, Global, Layout};
+use std::marker::PhantomData;
 use std::mem;
 use std::ops::{Deref, DerefMut};
 use std::ptr::{self, Unique};
 
-struct IntoIter<T> {
-    buf: RawVec<T>,
+struct RawValIter<T> {
     startp: *const T,
     endp: *const T,
 }
 
-impl<T> Iterator for IntoIter<T> {
+impl<T> RawValIter<T> {
+    // mark it unsafe because it has unbonud lifetime
+    // In our private implementation, we will store RawValIter with RawVec
+    unsafe fn new(slice: &[T]) -> Self {
+        RawValIter {
+            startp: slice.as_ptr(),
+            // if `len = 0`, then this is *might* not actually allocated memory.
+            // Need to avoid offsetting because that will give wrong
+            // information to LLVM via GEP.
+            endp: if slice.len() == 0 {
+                slice.as_ptr()
+            } else {
+                slice.as_ptr().add(slice.len())
+            },
+        }
+    }
+}
+
+impl<T> Iterator for RawValIter<T> {
     type Item = T;
     fn next(&mut self) -> Option<Self::Item> {
         if self.startp == self.endp {
@@ -35,7 +53,18 @@ impl<T> Iterator for IntoIter<T> {
     }
 }
 
-impl<T> DoubleEndedIterator for IntoIter<T> {
+impl<T> Drop for RawValIter<T> {
+    fn drop(&mut self) {
+        unsafe {
+            while self.startp < self.endp {
+                (self.startp as *mut T).drop_in_place();
+                self.startp = self.startp.add(1);
+            }
+        }
+    }
+}
+
+impl<T> DoubleEndedIterator for RawValIter<T> {
     fn next_back(&mut self) -> Option<Self::Item> {
         if self.startp == self.endp {
             None
@@ -49,14 +78,46 @@ impl<T> DoubleEndedIterator for IntoIter<T> {
     }
 }
 
-impl<T> Drop for IntoIter<T> {
-    fn drop(&mut self) {
-        unsafe {
-            while self.startp < self.endp {
-                (self.startp as *mut T).drop_in_place();
-                self.startp = self.startp.add(1);
-            }
-        }
+struct IntoIter<T> {
+    buf: RawVec<T>,
+    iter: RawValIter<T>,
+}
+
+impl<T> Iterator for IntoIter<T> {
+    type Item = T;
+    fn next(&mut self) -> Option<T> {
+        self.iter.next()
+    }
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        self.iter.size_hint()
+    }
+}
+
+impl<T> DoubleEndedIterator for IntoIter<T> {
+    fn next_back(&mut self) -> Option<T> {
+        self.iter.next_back()
+    }
+}
+
+struct Drain<'a, T> {
+    // MyVec can't be mutated during Drain is being held.
+    _vec: PhantomData<&'a mut MyVec<T>>,
+    iter: RawValIter<T>,
+}
+
+impl<'a, T> Iterator for Drain<'a, T> {
+    type Item = T;
+    fn next(&mut self) -> Option<T> {
+        self.iter.next()
+    }
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        self.iter.size_hint()
+    }
+}
+
+impl<'a, T> DoubleEndedIterator for Drain<'a, T> {
+    fn next_back(&mut self) -> Option<T> {
+        self.iter.next_back()
     }
 }
 
@@ -67,14 +128,12 @@ impl<T> IntoIterator for MyVec<T> {
         unsafe {
             // RawVec !: Copy, so we get buf without destructure it.
             let buf = ptr::read(&self.buf);
-            let startp = self.ptr();
-            let endp = startp.add(self.len);
+            let raw_iter = RawValIter::new(&self);
             // IntoIter is responsible for dropping now.
             mem::forget(self);
             IntoIter {
                 buf,
-                startp,
-                endp,
+                iter: raw_iter,
             }
         }
     }
@@ -217,6 +276,20 @@ impl<T> MyVec<T> {
             unsafe { Some(ptr::read(self.ptr().offset(self.len as isize))) }
         }
     }
+
+    pub fn drain(&mut self) -> Drain<'_, T> {
+        unsafe {
+            let iter = RawValIter::new(&self);
+
+            // make it safe to forget Drain, but it also leads to leak amplification
+            self.len = 0;
+
+            Drain {
+                iter,
+                _vec: PhantomData,
+            }
+        }
+    }
 }
 
 impl<T> Drop for MyVec<T> {
@@ -328,6 +401,22 @@ mod test {
 
         assert!(weak[1].upgrade().is_none());
         assert!(weak[2].upgrade().is_none());
+    }
+
+    #[test]
+    fn test_myvec_drain() {
+        let mut v = MyVec::new();
+        for x in 1..5usize {
+            v.push(x);
+        }
+        v.drain();
+        v.push(21);
+
+        // error: cannot borrow `v` as mutable more than once at a time
+        // let mut d = v.drain();
+        // v.push(21);
+        // println!("{}", d.next());
+        assert_eq!(&[21], &*v);
     }
 }
 

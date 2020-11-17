@@ -14,6 +14,81 @@ struct MyVec<T> {
     cap: usize,
 }
 
+struct IntoIter<T> {
+    ptr: Unique<T>,
+    layout: Layout,
+    startp: *const T,
+    endp: *const T,
+}
+
+impl<T> Iterator for IntoIter<T> {
+    type Item = T;
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.startp == self.endp {
+            None
+        } else {
+            unsafe {
+                let result = ptr::read(self.startp);
+                self.startp = self.startp.add(1);
+                Some(result)
+            }
+        }
+    }
+
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        let len =
+            (self.endp as usize - self.startp as usize) / mem::size_of::<T>();
+        (len, Some(len))
+    }
+}
+
+impl<T> DoubleEndedIterator for IntoIter<T> {
+    fn next_back(&mut self) -> Option<Self::Item> {
+        if self.startp == self.endp {
+            None
+        } else {
+            unsafe {
+                self.endp = self.endp.sub(1);
+                let result = ptr::read(self.endp);
+                Some(result)
+            }
+        }
+    }
+}
+
+impl<T> Drop for IntoIter<T> {
+    fn drop(&mut self) {
+        unsafe {
+            while self.startp < self.endp {
+                (self.startp as *mut T).drop_in_place();
+                self.startp = self.startp.add(1);
+            }
+            Global.dealloc(self.ptr.cast().into(), self.layout);
+        }
+    }
+}
+
+impl<T> IntoIterator for MyVec<T> {
+    type Item = T;
+    type IntoIter = IntoIter<T>;
+    fn into_iter(self) -> Self::IntoIter {
+        unsafe {
+            let ptr = self.ptr;
+            let layout = self.current_layout();
+            let startp = self.ptr.as_ptr();
+            let endp = startp.add(self.len);
+            // IntoIter is responsible for dropping now.
+            mem::forget(self);
+            IntoIter {
+                ptr,
+                layout,
+                startp,
+                endp,
+            }
+        }
+    }
+}
+
 impl<T> MyVec<T> {
     pub fn new() -> Self {
         assert!(mem::size_of::<T>() != 0, "We're not ready to handle ZSTs");
@@ -56,12 +131,11 @@ impl<T> MyVec<T> {
             let result = ptr::read(self.ptr.as_ptr().offset(index as isize));
             ptr::copy(
                 self.ptr.as_ptr().offset(1 + index as isize),
-                self.ptr.as_ptr().offset( index as isize),
-                self.len - index
+                self.ptr.as_ptr().offset(index as isize),
+                self.len - index,
             );
             result
         }
-
     }
 
     pub fn push(&mut self, elem: T) {
@@ -147,7 +221,6 @@ impl<T> DerefMut for MyVec<T> {
     }
 }
 
-
 #[cfg(test)]
 mod test {
     use super::*;
@@ -155,26 +228,23 @@ mod test {
     #[test]
     fn test_myvec_drop() {
         let mut v = MyVec::new();
-        let s1 = Rc::new(String::from("hello"));
-        let s1_weak = Rc::downgrade(&s1);
-        let s2 = Rc::new(String::from("world"));
-        let s2_weak = Rc::downgrade(&s2);
-        let s3 = Rc::new(String::from("....."));
-        let s3_weak = Rc::downgrade(&s3);
-        v.push(s1);
-        v.push(s2);
-        v.push(s3);
+        let strs = ["hello", "world", "again"];
+        let mut weak = Vec::new();
+        for str in &strs {
+            let s = Rc::new(String::from(*str));
+            weak.push(Rc::downgrade(&s));
+            v.push(s);
+        }
         {
             v.pop();
         }
-        assert!(s3_weak.upgrade().is_none(), "pop didn't drop");
+        assert!(weak[2].upgrade().is_none(), "pop didn't drop");
         {
             drop(v);
         }
-        assert!(s1_weak.upgrade().is_none(), "myvec didn't drop");
-        assert!(s2_weak.upgrade().is_none(), "myvec didn't drop");
+        assert!(weak[0].upgrade().is_none(), "myvec didn't drop");
+        assert!(weak[1].upgrade().is_none(), "myvec didn't drop");
     }
-
 
     #[test]
     fn test_myvec_deref() {
@@ -207,7 +277,34 @@ mod test {
         assert_eq!(&[1, 2, 4], &*v);
         assert_eq!(v.remove(2), 4);
         assert_eq!(&[1, 2], &*v);
+    }
 
+    #[test]
+    fn test_myvec_intoiter() {
+        let mut v = MyVec::new();
+        let strs = ["hello", "world", "again", "and again"];
+        let mut weak = Vec::new();
+        for str in &strs {
+            let s = Rc::new(String::from(*str));
+            weak.push(Rc::downgrade(&s));
+            v.push(s);
+        }
+
+        let mut iter = v.into_iter();
+        {
+            iter.next();
+            iter.next_back();
+        }
+
+        assert!(weak[0].upgrade().is_none());
+        assert!(weak[3].upgrade().is_none());
+        {
+            assert!(weak[1].upgrade().is_some());
+            drop(iter);
+        }
+
+        assert!(weak[1].upgrade().is_none());
+        assert!(weak[2].upgrade().is_none());
     }
 }
 

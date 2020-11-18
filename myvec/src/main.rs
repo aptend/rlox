@@ -20,14 +20,36 @@ impl<T> RawValIter<T> {
     unsafe fn new(slice: &[T]) -> Self {
         RawValIter {
             startp: slice.as_ptr(),
-            // if `len = 0`, then this is *might* not actually allocated memory.
-            // Need to avoid offsetting because that will give wrong
-            // information to LLVM via GEP.
-            endp: if slice.len() == 0 {
+            endp: if mem::size_of::<T>() == 0 {
+                (slice.as_ptr() as usize + slice.len()) as *const T
+            } else if slice.len() == 0 {
+                // if `len = 0`, then this is *might* not actually allocated memory.
+                // Need to avoid offsetting because that will give wrong
+                // information to LLVM via GEP.
                 slice.as_ptr()
             } else {
                 slice.as_ptr().add(slice.len())
             },
+        }
+    }
+
+    fn inc_startp(&mut self) {
+        unsafe {
+            self.startp = if mem::size_of::<T>() == 0 {
+                (self.startp as usize + 1) as *const T
+            } else {
+                self.startp.add(1)
+            };
+        }
+    }
+
+    fn dec_endp(&mut self) {
+        unsafe {
+            self.endp = if mem::size_of::<T>() == 0 {
+                (self.endp as usize - 1) as *const T
+            } else {
+                self.startp.sub(1)
+            };
         }
     }
 }
@@ -40,15 +62,16 @@ impl<T> Iterator for RawValIter<T> {
         } else {
             unsafe {
                 let result = ptr::read(self.startp);
-                self.startp = self.startp.add(1);
+                self.inc_startp();
                 Some(result)
             }
         }
     }
 
     fn size_hint(&self) -> (usize, Option<usize>) {
-        let len =
-            (self.endp as usize - self.startp as usize) / mem::size_of::<T>();
+        let elem_size = mem::size_of::<T>();
+        let elem_size = if elem_size == 0 { 1 } else { elem_size };
+        let len = (self.endp as usize - self.startp as usize) / elem_size;
         (len, Some(len))
     }
 }
@@ -58,7 +81,7 @@ impl<T> Drop for RawValIter<T> {
         unsafe {
             while self.startp < self.endp {
                 (self.startp as *mut T).drop_in_place();
-                self.startp = self.startp.add(1);
+                self.inc_startp();
             }
         }
     }
@@ -70,7 +93,7 @@ impl<T> DoubleEndedIterator for RawValIter<T> {
             None
         } else {
             unsafe {
-                self.endp = self.endp.sub(1);
+                self.dec_endp();
                 let result = ptr::read(self.endp);
                 Some(result)
             }
@@ -146,10 +169,14 @@ struct RawVec<T> {
 
 impl<T> RawVec<T> {
     pub fn new() -> Self {
-        assert!(mem::size_of::<T>() != 0, "We're not ready to handle ZSTs");
+        let cap = if mem::size_of::<T>() != 0 {
+            0
+        } else {
+            usize::MAX
+        };
         RawVec {
             ptr: Unique::dangling(),
-            cap: 0,
+            cap,
         }
     }
 
@@ -161,6 +188,10 @@ impl<T> RawVec<T> {
 
     pub fn grow(&mut self) {
         unsafe {
+            let elem_size = mem::size_of::<T>();
+            // never allocate ZST
+            assert!(elem_size != 0, "capacity overflow");
+
             if self.cap == 0 {
                 let layout = Layout::new::<T>();
                 let ptr = match Global.alloc(layout) {
@@ -192,7 +223,8 @@ impl<T> RawVec<T> {
 
 impl<T> Drop for RawVec<T> {
     fn drop(&mut self) {
-        if self.cap != 0 {
+        let elem_size = mem::size_of::<T>();
+        if self.cap != 0 && elem_size != 0 {
             unsafe {
                 let layout = self.current_layout();
                 Global.dealloc(self.ptr.cast().into(), layout);
@@ -208,7 +240,6 @@ struct MyVec<T> {
 
 impl<T> MyVec<T> {
     pub fn new() -> Self {
-        assert!(mem::size_of::<T>() != 0, "We're not ready to handle ZSTs");
         MyVec {
             buf: RawVec::new(),
             len: 0,
@@ -297,6 +328,7 @@ impl<T> Drop for MyVec<T> {
         let len = self.len as isize;
         self.len = 0;
         unsafe {
+            // it is safe even T is ZST, since self.ptr() is non-zero and aligned.
             for i in 0..len {
                 ptr::drop_in_place(self.ptr().offset(i));
             }
@@ -417,6 +449,21 @@ mod test {
         // v.push(21);
         // println!("{}", d.next());
         assert_eq!(&[21], &*v);
+    }
+
+    #[test]
+    fn test_myvec_zst() {
+        let mut v = MyVec::new();
+        for _ in 1..5usize {
+            v.push(());
+        }
+        assert!(v.cap() == usize::MAX);
+        assert!(() == v.pop().unwrap());
+
+        v.drain();
+        v.push(());
+        assert!(() == v.pop().unwrap());
+        assert!(v.len() == 0);
     }
 }
 
